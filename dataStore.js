@@ -14,10 +14,11 @@ const STORE_FILES = {
   fieldSessions: join(DATA_DIR, "fieldSessions.json"),
   ringInventory: join(DATA_DIR, "ringInventory.json"),
   auditLogs: join(DATA_DIR, "auditLogs.json"),
+  offlineSyncTracker: join(DATA_DIR, "offlineSyncTracker.json"),
   legacySeabirds: join(DATA_DIR, "seabirds.json")
 };
 
-const STORE_ORDER = ["birds", "events", "reports", "dictionaries", "fieldSessions", "ringInventory", "auditLogs"];
+const STORE_ORDER = ["birds", "events", "reports", "dictionaries", "fieldSessions", "ringInventory", "auditLogs", "offlineSyncTracker"];
 const EVENT_TYPES = ["measurements", "releases", "recaptures", "observations"];
 
 function nowIso() {
@@ -422,7 +423,11 @@ async function performMigration() {
     }
     for (const storeName of missingStores) {
       if (storeName !== "birds" && storeName !== "events" && storeName !== "reports") {
-        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
+        const seedData = SEED_DATA[storeName];
+        const data = seedData !== undefined
+          ? JSON.parse(JSON.stringify(seedData))
+          : defaultForStore(storeName);
+        writeBatch.push([STORE_FILES[storeName], data]);
       }
     }
 
@@ -435,11 +440,11 @@ async function performMigration() {
     };
   } else {
     for (const storeName of missingStores) {
-      if (storeName === "birds" || storeName === "events" || storeName === "reports") {
-        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
-      } else {
-        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
-      }
+      const seedData = SEED_DATA[storeName];
+      const data = seedData !== undefined
+        ? JSON.parse(JSON.stringify(seedData))
+        : defaultForStore(storeName);
+      writeBatch.push([STORE_FILES[storeName], data]);
     }
   }
 
@@ -592,6 +597,7 @@ function defaultForStore(storeName) {
     case "fieldSessions": return { fieldSessions: [] };
     case "ringInventory": return { batches: [], rings: [] };
     case "auditLogs": return { logs: [] };
+    case "offlineSyncTracker": return { processedPackets: [] };
     default: return {};
   }
 }

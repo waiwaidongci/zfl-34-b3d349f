@@ -1,0 +1,78 @@
+{
+  "processedPackets": [
+    {
+      "packetId": "SYNC-TEST-20260620-001",
+      "processedAt": "2026-06-20T15:04:20.803Z",
+      "result": {
+        "packetId": "SYNC-TEST-20260620-001",
+        "processedAt": "2026-06-20T15:04:20.803Z",
+        "success": {
+          "birds": 2,
+          "events": 4,
+          "sessions": 1
+        },
+        "conflicts": [],
+        "failures": [],
+        "skipped": [],
+        "ringNoConflicts": [],
+        "status": "success"
+      }
+    },
+    {
+      "packetId": "SYNC-TEST-20260620-002",
+      "processedAt": "2026-06-20T15:04:43.687Z",
+      "result": {
+        "packetId": "SYNC-TEST-20260620-002",
+        "processedAt": "2026-06-20T15:04:43.687Z",
+        "success": {
+          "birds": 1,
+          "events": 1,
+          "sessions": 0
+        },
+        "conflicts": [
+          {
+            "type": "bird",
+            "tempId": "bird-conflict-001",
+            "ringNo": "SB-26001",
+            "reason": "ring_already_exists_in_db"
+          }
+        ],
+        "failures": [
+          {
+            "type": "bird",
+            "tempId": "bird-invalid-001",
+            "ringNo": "SB-26023",
+            "reason": "validation_failed",
+            "details": [
+              "字段「species」的值「未知物种」不在字典中"
+            ]
+          },
+          {
+            "type": "event",
+            "tempId": "evt-invalid-type",
+            "ringNo": "SB-26022",
+            "eventType": "invalid_type",
+            "reason": "invalid_event_type"
+          }
+        ],
+        "skipped": [
+          {
+            "type": "event",
+            "tempId": "evt-dup-obs",
+            "ringNo": "SB-26001",
+            "eventType": "observations",
+            "reason": "already_exists_in_db"
+          }
+        ],
+        "ringNoConflicts": [
+          {
+            "tempId": "bird-conflict-001",
+            "ringNo": "SB-26001",
+            "reason": "ring_already_exists_in_db"
+          }
+        ],
+        "status": "partial_success"
+      }
+    }
+  ]
+}

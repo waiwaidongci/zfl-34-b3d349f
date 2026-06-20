@@ -44,6 +44,222 @@
         "releasesCount": 0,
         "healthRiskLevel": "low"
       }
+    },
+    {
+      "id": "LOG-MQMHN6OU-29d59975",
+      "timestamp": "2026-06-20T15:04:01.950Z",
+      "operationType": "bird_create",
+      "targetType": "bird",
+      "targetId": "SB-26010",
+      "requestSummary": {
+        "ringNo": "SB-26010",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春"
+      },
+      "before": null,
+      "after": {
+        "ringNo": "SB-26010",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "fieldSessionId": "FS-2026-0503-001",
+        "measurementsCount": 0,
+        "recapturesCount": 0,
+        "observationsCount": 0,
+        "releasesCount": 0,
+        "healthRiskLevel": "high"
+      }
+    },
+    {
+      "id": "LOG-MQMHNL8L-6a8f778a",
+      "timestamp": "2026-06-20T15:04:20.805Z",
+      "operationType": "session_create",
+      "targetType": "session",
+      "targetId": "FS-2026-0618-OCZL",
+      "requestSummary": {
+        "date": "2026-06-18",
+        "season": "2026春",
+        "capturePlace": "东礁A区",
+        "team": [
+          "赵六",
+          "孙七"
+        ],
+        "capturedCount": 3,
+        "releasedCount": 3
+      },
+      "before": null,
+      "after": {
+        "id": "FS-2026-0618-OCZL",
+        "date": "2026-06-18",
+        "season": "2026春",
+        "capturePlace": "东礁A区",
+        "team": [
+          "赵六",
+          "孙七"
+        ],
+        "capturedCount": 3,
+        "releasedCount": 3
+      }
+    },
+    {
+      "id": "LOG-MQMHNL8V-e2bd3528",
+      "timestamp": "2026-06-20T15:04:20.815Z",
+      "operationType": "offline_sync_packet",
+      "targetType": "offline_sync",
+      "targetId": "SYNC-TEST-20260620-001",
+      "requestSummary": {
+        "packetId": "SYNC-TEST-20260620-001",
+        "inputCounts": {
+          "sessions": 1,
+          "birds": 2,
+          "events": 4
+        },
+        "success": {
+          "birds": 2,
+          "events": 4,
+          "sessions": 1
+        },
+        "conflictsCount": 0,
+        "failuresCount": 0,
+        "skippedCount": 0,
+        "ringNoConflictCount": 0,
+        "status": "success"
+      },
+      "before": null,
+      "after": {
+        "createdSessions": [
+          {
+            "id": "FS-2026-0618-OCZL",
+            "date": "2026-06-18",
+            "season": "2026春",
+            "capturePlace": "东礁A区",
+            "team": [
+              "赵六",
+              "孙七"
+            ],
+            "capturedCount": 3,
+            "releasedCount": 3
+          }
+        ],
+        "createdBirds": [
+          {
+            "tempId": "bird-temp-001",
+            "ringNo": "SB-26020",
+            "bird": {
+              "ringNo": "SB-26020",
+              "species": "黑尾鸥",
+              "sex": "female",
+              "age": "juvenile",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": "FS-2026-0618-OCZL",
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "high"
+            }
+          },
+          {
+            "tempId": "bird-temp-002",
+            "ringNo": "SB-26021",
+            "bird": {
+              "ringNo": "SB-26021",
+              "species": "黑尾鸥",
+              "sex": "male",
+              "age": "adult",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": "FS-2026-0618-OCZL",
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "high"
+            }
+          }
+        ],
+        "ringNoConflicts": []
+      }
+    },
+    {
+      "id": "LOG-MQMHO2WJ-17edee83",
+      "timestamp": "2026-06-20T15:04:43.699Z",
+      "operationType": "offline_sync_packet",
+      "targetType": "offline_sync",
+      "targetId": "SYNC-TEST-20260620-002",
+      "requestSummary": {
+        "packetId": "SYNC-TEST-20260620-002",
+        "inputCounts": {
+          "sessions": 0,
+          "birds": 3,
+          "events": 3
+        },
+        "success": {
+          "birds": 1,
+          "events": 1,
+          "sessions": 0
+        },
+        "conflictsCount": 1,
+        "failuresCount": 2,
+        "skippedCount": 1,
+        "ringNoConflictCount": 1,
+        "status": "partial_success"
+      },
+      "before": null,
+      "after": {
+        "createdSessions": [],
+        "createdBirds": [
+          {
+            "tempId": "bird-conflict-001",
+            "ringNo": "SB-26001",
+            "bird": {
+              "ringNo": "SB-26001",
+              "species": "黑尾鸥",
+              "sex": "unknown",
+              "age": "adult",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": "FS-2026-0503-001",
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "low"
+            }
+          },
+          {
+            "tempId": "bird-new-003",
+            "ringNo": "SB-26022",
+            "bird": {
+              "ringNo": "SB-26022",
+              "species": "黑尾鸥",
+              "sex": "female",
+              "age": "adult",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": null,
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "high"
+            }
+          }
+        ],
+        "ringNoConflicts": [
+          {
+            "tempId": "bird-conflict-001",
+            "ringNo": "SB-26001",
+            "reason": "ring_already_exists_in_db"
+          }
+        ]
+      }
     }
   ]
 }

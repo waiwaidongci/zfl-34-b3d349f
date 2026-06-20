@@ -34,6 +34,23 @@
       "notes": "部分个体处于换羽期",
       "createdAt": "2026-06-11T08:00:00.000Z",
       "updatedAt": "2026-06-11T16:30:00.000Z"
+    },
+    {
+      "id": "FS-2026-0618-OCZL",
+      "date": "2026-06-18",
+      "season": "2026春",
+      "capturePlace": "东礁A区",
+      "team": [
+        "赵六",
+        "孙七"
+      ],
+      "weather": "晴，风力2级",
+      "tide": null,
+      "capturedCount": 3,
+      "releasedCount": 3,
+      "notes": "测试离线同步作业场次",
+      "createdAt": "2026-06-20T15:04:20.804Z",
+      "updatedAt": "2026-06-20T15:04:20.804Z"
     }
   ]
 }

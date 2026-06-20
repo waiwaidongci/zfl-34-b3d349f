@@ -22,7 +22,8 @@ export const OPERATION_TYPES = {
   SESSION_DELETE: "session_delete",
   DICTIONARY_ENTRY_ADD: "dictionary_entry_add",
   DICTIONARY_ENTRY_UPDATE: "dictionary_entry_update",
-  DICTIONARY_ENTRY_DELETE: "dictionary_entry_delete"
+  DICTIONARY_ENTRY_DELETE: "dictionary_entry_delete",
+  OFFLINE_SYNC_PACKET: "offline_sync_packet"
 };
 
 export const TARGET_TYPES = {
@@ -31,7 +32,8 @@ export const TARGET_TYPES = {
   RING_BATCH: "ring_batch",
   SESSION: "session",
   DICTIONARY: "dictionary",
-  SYSTEM: "system"
+  SYSTEM: "system",
+  OFFLINE_SYNC: "offline_sync"
 };
 
 function generateLogId() {

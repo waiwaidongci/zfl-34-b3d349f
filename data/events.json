@@ -66,6 +66,82 @@
         "at": "2026-06-20",
         "fieldSessionId": null
       }
+    },
+    {
+      "ringNo": "SB-26010",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-20",
+        "wing": 330,
+        "weight": 520,
+        "bill": 45,
+        "fieldSessionId": "FS-2026-0503-001"
+      }
+    },
+    {
+      "ringNo": "SB-26010",
+      "eventType": "releases",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-20T10:00:00.000Z",
+        "place": "东礁A区",
+        "fieldSessionId": "FS-2026-0503-001"
+      }
+    },
+    {
+      "ringNo": "SB-26020",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-18",
+        "wing": 310,
+        "weight": 450,
+        "bill": 42,
+        "fieldSessionId": "FS-2026-0618-OCZL"
+      }
+    },
+    {
+      "ringNo": "SB-26020",
+      "eventType": "releases",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-18T09:30:00.000Z",
+        "place": "东礁A区",
+        "fieldSessionId": "FS-2026-0618-OCZL"
+      }
+    },
+    {
+      "ringNo": "SB-26021",
+      "eventType": "recaptures",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-19T08:15:00.000Z",
+        "place": "东礁B区",
+        "note": "状态良好，换羽中",
+        "fieldSessionId": "FS-2026-0618-OCZL"
+      }
+    },
+    {
+      "ringNo": "SB-26001",
+      "eventType": "observations",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-19T14:00:00.000Z",
+        "point": "N30.2,E122.4",
+        "note": "近海觅食"
+      }
+    },
+    {
+      "ringNo": "SB-26022",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-20",
+        "wing": 325,
+        "weight": 500,
+        "bill": 43
+      }
     }
   ]
 }

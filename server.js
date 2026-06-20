@@ -32,6 +32,7 @@ import {
   queryAuditLogs,
   getAuditLogStats
 } from "./auditLog.js";
+import { processOfflinePacket } from "./offlineSync.js";
 import {
   listBirds,
   findBirdByRingNo,
@@ -346,7 +347,8 @@ const server = http.createServer(async (req, res) => {
         "GET /audit-logs?dateFrom=&dateTo=&operationType=&ringNo=&targetId=&limit=&offset=",
         "GET /audit-logs/stats",
         "POST /backups/snapshots", "GET /backups/snapshots",
-        "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/restore"
+        "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/restore",
+        "POST /offline-sync"
       ]
     });
 
@@ -439,6 +441,21 @@ const server = http.createServer(async (req, res) => {
           operationTypes: Object.values(OPERATION_TYPES),
           targetTypes: Object.values(TARGET_TYPES)
         });
+      }
+    }
+
+    if (req.method === "POST" && url.pathname === "/offline-sync") {
+      const input = await body(req);
+      if (!input || typeof input !== "object") {
+        return send(res, 400, { error: "invalid_input", message: "请求体必须是有效的JSON对象" });
+      }
+      try {
+        const result = await processOfflinePacket(input);
+        const statusCode = result.status === "success" ? 200 :
+                          (result.status === "partial_success" ? 207 : 400);
+        return send(res, statusCode, result);
+      } catch (e) {
+        return send(res, 500, { error: "sync_failed", message: e.message });
       }
     }
 

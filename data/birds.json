@@ -95,6 +95,102 @@
         "calculatedAt": "2026-06-20T10:18:54.536Z",
         "latestMeasurement": null
       }
+    },
+    {
+      "ringNo": "SB-26010",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": {
+        "ringNo": "SB-26010",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T15:04:01.948Z",
+        "latestMeasurement": null
+      }
+    },
+    {
+      "ringNo": "SB-26020",
+      "species": "黑尾鸥",
+      "sex": "female",
+      "age": "juvenile",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0618-OCZL",
+      "healthRisk": {
+        "ringNo": "SB-26020",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T15:04:20.811Z",
+        "latestMeasurement": null
+      }
+    },
+    {
+      "ringNo": "SB-26021",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0618-OCZL",
+      "healthRisk": {
+        "ringNo": "SB-26021",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T15:04:20.812Z",
+        "latestMeasurement": null
+      }
+    },
+    {
+      "ringNo": "SB-26022",
+      "species": "黑尾鸥",
+      "sex": "female",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": null,
+      "healthRisk": {
+        "ringNo": "SB-26022",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T15:04:43.696Z",
+        "latestMeasurement": null
+      }
     }
   ]
 }
