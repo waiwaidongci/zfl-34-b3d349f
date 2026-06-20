@@ -2,9 +2,7 @@ import {
   initialize,
   loadLegacyCompatibleDb,
   readStore,
-  writeStore,
-  atomicWriteFile,
-  readJsonSafely
+  writeStore
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -12,50 +10,10 @@ import {
   recordAuditLog,
   pickRingKeyFields
 } from "./auditLog.js";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const inventoryPath = join(__dirname, "data", "ringInventory.json");
-
-const seed = {
-  batches: [
-    {
-      id: "BATCH-2026-SPRING-001",
-      prefix: "SB",
-      startNo: 26000,
-      endNo: 26999,
-      season: "2026春",
-      description: "2026年春季黑尾鸥环志批次",
-      createdAt: "2026-01-15T00:00:00.000Z"
-    }
-  ],
-  rings: [
-    {
-      ringNo: "SB-26001",
-      batchId: "BATCH-2026-SPRING-001",
-      status: "allocated",
-      allocatedTo: "SB-26001",
-      allocatedAt: "2026-05-03T00:00:00.000Z"
-    },
-    {
-      ringNo: "SB-26002",
-      batchId: "BATCH-2026-SPRING-001",
-      status: "available",
-      allocatedTo: null,
-      allocatedAt: null
-    }
-  ]
-};
 
 async function loadInventory() {
   await initialize();
-  const data = await readStore("ringInventory");
-  if ((!data.batches || data.batches.length === 0) && (!data.rings || data.rings.length === 0)) {
-    await writeStore("ringInventory", seed);
-    return JSON.parse(JSON.stringify(seed));
-  }
-  return data;
+  return await readStore("ringInventory");
 }
 
 async function saveInventory(inventory) {

@@ -3,36 +3,36 @@
     {
       "value": "黑尾鸥",
       "description": null,
-      "createdAt": "2026-06-20T00:00:00.000Z",
-      "updatedAt": "2026-06-20T00:00:00.000Z"
+      "createdAt": "2026-06-20T14:38:02.672Z",
+      "updatedAt": "2026-06-20T14:38:02.672Z"
     },
     {
       "value": "红嘴鸥",
       "description": null,
-      "createdAt": "2026-06-20T00:00:00.000Z",
-      "updatedAt": "2026-06-20T00:00:00.000Z"
+      "createdAt": "2026-06-20T14:38:02.672Z",
+      "updatedAt": "2026-06-20T14:38:02.672Z"
     }
   ],
   "capturePlace": [
     {
       "value": "东礁A区",
       "description": null,
-      "createdAt": "2026-06-20T00:00:00.000Z",
-      "updatedAt": "2026-06-20T00:00:00.000Z"
+      "createdAt": "2026-06-20T14:38:02.672Z",
+      "updatedAt": "2026-06-20T14:38:02.672Z"
     },
     {
       "value": "东礁B区",
       "description": null,
-      "createdAt": "2026-06-20T00:00:00.000Z",
-      "updatedAt": "2026-06-20T00:00:00.000Z"
+      "createdAt": "2026-06-20T14:38:02.672Z",
+      "updatedAt": "2026-06-20T14:38:02.672Z"
     }
   ],
   "season": [
     {
       "value": "2026春",
       "description": null,
-      "createdAt": "2026-06-20T00:00:00.000Z",
-      "updatedAt": "2026-06-20T00:00:00.000Z"
+      "createdAt": "2026-06-20T14:38:02.672Z",
+      "updatedAt": "2026-06-20T14:38:02.672Z"
     }
   ]
 }

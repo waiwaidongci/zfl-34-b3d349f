@@ -1,0 +1,39 @@
+{
+  "fieldSessions": [
+    {
+      "id": "FS-2026-0503-001",
+      "date": "2026-05-03",
+      "season": "2026春",
+      "capturePlace": "东礁A区",
+      "team": [
+        "张三",
+        "李四",
+        "王五"
+      ],
+      "weather": "晴，风力3级",
+      "tide": "高潮 08:20，潮高2.1m",
+      "capturedCount": 15,
+      "releasedCount": 15,
+      "notes": "鸟群活跃度高，无异常情况",
+      "createdAt": "2026-05-03T10:00:00.000Z",
+      "updatedAt": "2026-05-03T18:00:00.000Z"
+    },
+    {
+      "id": "FS-2026-0611-001",
+      "date": "2026-06-11",
+      "season": "2026春",
+      "capturePlace": "东礁B区",
+      "team": [
+        "张三",
+        "李四"
+      ],
+      "weather": "多云，风力4级",
+      "tide": "低潮 10:15，潮高0.8m",
+      "capturedCount": 8,
+      "releasedCount": 8,
+      "notes": "部分个体处于换羽期",
+      "createdAt": "2026-06-11T08:00:00.000Z",
+      "updatedAt": "2026-06-11T16:30:00.000Z"
+    }
+  ]
+}

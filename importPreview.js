@@ -5,6 +5,7 @@ import {
   readEventsStore,
   writeBirdsStore,
   writeEventsStore,
+  writeBirdsAndEventsStore,
   reassembleBirdFromEvents
 } from "./dataStore.js";
 import { randomUUID } from "node:crypto";
@@ -250,8 +251,7 @@ async function commitImport(previewId) {
     existingRingNos.add(rec.ringNo);
   }
 
-  await writeBirdsStore(birdsStore);
-  await writeEventsStore(eventsStore);
+  await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
   for (const bird of imported) {
     try {

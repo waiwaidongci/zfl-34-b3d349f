@@ -56,19 +56,6 @@
       }
     },
     {
-      "ringNo": "SB-26005",
-      "eventType": "recaptures",
-      "eventIndex": 0,
-      "data": {
-        "at": "2026-06-20",
-        "place": "东礁B区",
-        "status": "healthy",
-        "weight": 498,
-        "fieldSessionId": "FS-2026-0503-001",
-        "notes": "新增回捕测试验证"
-      }
-    },
-    {
       "ringNo": "SB-26006",
       "eventType": "measurements",
       "eventIndex": 0,

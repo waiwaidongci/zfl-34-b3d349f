@@ -2,9 +2,7 @@ import {
   initialize,
   loadLegacyCompatibleDb,
   readStore,
-  writeStore,
-  readJsonSafely,
-  atomicWriteFile
+  writeStore
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -12,12 +10,6 @@ import {
   recordAuditLog,
   pickDictEntryKeyFields
 } from "./auditLog.js";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const dictPath = join(__dirname, "data", "dictionaries.json");
-const sessionsPath = join(__dirname, "data", "fieldSessions.json");
 
 export const DICTIONARY_TYPES = ["species", "capturePlace", "season"];
 
@@ -47,7 +39,7 @@ async function loadBirdsSafely() {
 
 async function loadSessionsSafely() {
   try {
-    return await readJsonSafely(sessionsPath, { fieldSessions: [] });
+    return await readStore("fieldSessions");
   } catch (_) {
     return { fieldSessions: [] };
   }
@@ -91,7 +83,7 @@ export async function loadDictionaries() {
   }
   if (needsInit) {
     const initial = await buildInitialDictionaries();
-    await atomicWriteFile(dictPath, initial);
+    await writeStore("dictionaries", initial);
     return initial;
   }
   for (const type of DICTIONARY_TYPES) {

@@ -2,8 +2,7 @@ import {
   initialize,
   loadLegacyCompatibleDb,
   readStore,
-  writeStore,
-  atomicWriteFile
+  writeStore
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -11,53 +10,10 @@ import {
   recordAuditLog,
   pickSessionKeyFields
 } from "./auditLog.js";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const sessionsPath = join(__dirname, "data", "fieldSessions.json");
-
-const seed = {
-  fieldSessions: [
-    {
-      id: "FS-2026-0503-001",
-      date: "2026-05-03",
-      season: "2026春",
-      capturePlace: "东礁A区",
-      team: ["张三", "李四", "王五"],
-      weather: "晴，风力3级",
-      tide: "高潮 08:20，潮高2.1m",
-      capturedCount: 15,
-      releasedCount: 15,
-      notes: "鸟群活跃度高，无异常情况",
-      createdAt: "2026-05-03T10:00:00.000Z",
-      updatedAt: "2026-05-03T18:00:00.000Z"
-    },
-    {
-      id: "FS-2026-0611-001",
-      date: "2026-06-11",
-      season: "2026春",
-      capturePlace: "东礁B区",
-      team: ["张三", "李四"],
-      weather: "多云，风力4级",
-      tide: "低潮 10:15，潮高0.8m",
-      capturedCount: 8,
-      releasedCount: 8,
-      notes: "发现3只换羽个体",
-      createdAt: "2026-06-11T09:00:00.000Z",
-      updatedAt: "2026-06-11T16:30:00.000Z"
-    }
-  ]
-};
 
 async function loadSessions() {
   await initialize();
-  const data = await readStore("fieldSessions");
-  if (!data.fieldSessions || data.fieldSessions.length === 0) {
-    await atomicWriteFile(sessionsPath, seed);
-    return JSON.parse(JSON.stringify(seed));
-  }
-  return data;
+  return await readStore("fieldSessions");
 }
 
 async function saveSessions(sessions) {

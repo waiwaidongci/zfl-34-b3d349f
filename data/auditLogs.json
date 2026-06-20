@@ -1,11 +1,11 @@
 {
   "logs": [
     {
-      "id": "LOG-MQMFNI52-05ade270",
-      "timestamp": "2026-06-20T14:08:17.558Z",
+      "id": "LOG-MQMGQXXY-fc9203db",
+      "timestamp": "2026-06-20T14:38:57.622Z",
       "operationType": "bird_recapture_append",
       "targetType": "bird",
-      "targetId": "SB-26005",
+      "targetId": "SB-26006",
       "requestSummary": {
         "action": "recaptures",
         "entry": {
@@ -13,16 +13,15 @@
           "place": "东礁B区",
           "status": "healthy",
           "weight": 498,
-          "fieldSessionId": "FS-2026-0503-001",
-          "notes": "新增回捕测试验证"
+          "fieldSessionId": "FS-2026-0503-001"
         }
       },
       "before": {
-        "ringNo": "SB-26005",
-        "species": "黑尾鸥",
-        "sex": "male",
-        "age": "adult",
-        "capturePlace": "东礁A区",
+        "ringNo": "SB-26006",
+        "species": "红嘴鸥",
+        "sex": "female",
+        "age": "subadult",
+        "capturePlace": "东礁B区",
         "season": "2026春",
         "fieldSessionId": null,
         "measurementsCount": 1,
@@ -32,11 +31,11 @@
         "healthRiskLevel": "low"
       },
       "after": {
-        "ringNo": "SB-26005",
-        "species": "黑尾鸥",
-        "sex": "male",
-        "age": "adult",
-        "capturePlace": "东礁A区",
+        "ringNo": "SB-26006",
+        "species": "红嘴鸥",
+        "sex": "female",
+        "age": "subadult",
+        "capturePlace": "东礁B区",
         "season": "2026春",
         "fieldSessionId": null,
         "measurementsCount": 0,

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, unlink, glob } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,55 +17,140 @@ const STORE_FILES = {
   legacySeabirds: join(DATA_DIR, "seabirds.json")
 };
 
+const STORE_ORDER = ["birds", "events", "reports", "dictionaries", "fieldSessions", "ringInventory", "auditLogs"];
 const EVENT_TYPES = ["measurements", "releases", "recaptures", "observations"];
 
-const SEED_BIRDS = {
-  birds: [
-    {
-      ringNo: "SB-26001",
-      species: "黑尾鸥",
-      sex: "unknown",
-      age: "adult",
-      capturePlace: "东礁A区",
-      season: "2026春",
-      fieldSessionId: "FS-2026-0503-001"
-    }
-  ]
-};
+function nowIso() {
+  return new Date().toISOString();
+}
+function buildDictEntry(value, description = null) {
+  const t = nowIso();
+  return { value, description, createdAt: t, updatedAt: t };
+}
 
-const SEED_EVENTS = {
-  events: [
-    {
-      ringNo: "SB-26001",
-      eventType: "measurements",
-      eventIndex: 0,
-      data: { at: "2026-05-03", wing: 328, weight: 512, bill: 44, fieldSessionId: "FS-2026-0503-001" }
-    },
-    {
-      ringNo: "SB-26001",
-      eventType: "releases",
-      eventIndex: 0,
-      data: { at: "2026-05-03T09:40:00.000Z", place: "东礁A区", fieldSessionId: "FS-2026-0503-001" }
-    },
-    {
-      ringNo: "SB-26001",
-      eventType: "recaptures",
-      eventIndex: 0,
-      data: { at: "2026-06-11", place: "东礁B区", note: "换羽正常", fieldSessionId: "FS-2026-0611-001" }
-    },
-    {
-      ringNo: "SB-26001",
-      eventType: "observations",
-      eventIndex: 0,
-      data: { at: "2026-06-15", point: "N30.1,E122.3", note: "近岸盘旋" }
-    }
-  ]
-};
-
-const SEED_REPORTS = {
+const SEED_DATA = {
+  birds: {
+    birds: [
+      {
+        ringNo: "SB-26001",
+        species: "黑尾鸥",
+        sex: "unknown",
+        age: "adult",
+        capturePlace: "东礁A区",
+        season: "2026春",
+        fieldSessionId: "FS-2026-0503-001"
+      }
+    ]
+  },
+  events: {
+    events: [
+      {
+        ringNo: "SB-26001",
+        eventType: "measurements",
+        eventIndex: 0,
+        data: { at: "2026-05-03", wing: 328, weight: 512, bill: 44, fieldSessionId: "FS-2026-0503-001" }
+      },
+      {
+        ringNo: "SB-26001",
+        eventType: "releases",
+        eventIndex: 0,
+        data: { at: "2026-05-03T09:40:00.000Z", place: "东礁A区", fieldSessionId: "FS-2026-0503-001" }
+      },
+      {
+        ringNo: "SB-26001",
+        eventType: "recaptures",
+        eventIndex: 0,
+        data: { at: "2026-06-11", place: "东礁B区", note: "换羽正常", fieldSessionId: "FS-2026-0611-001" }
+      },
+      {
+        ringNo: "SB-26001",
+        eventType: "observations",
+        eventIndex: 0,
+        data: { at: "2026-06-15", point: "N30.1,E122.3", note: "近岸盘旋" }
+      }
+    ]
+  },
   reports: {
-    generatedAt: null,
-    recaptureRateCache: []
+    reports: {
+      generatedAt: null,
+      recaptureRateCache: []
+    }
+  },
+  dictionaries: (function buildDictSeed() {
+    const MANDATORY_SEED = {
+      species: ["黑尾鸥"],
+      capturePlace: ["东礁A区", "东礁B区"],
+      season: ["2026春"]
+    };
+    const dict = { species: [], capturePlace: [], season: [] };
+    for (const type of ["species", "capturePlace", "season"]) {
+      for (const v of MANDATORY_SEED[type]) dict[type].push(buildDictEntry(v));
+    }
+    return dict;
+  })(),
+  fieldSessions: {
+    fieldSessions: [
+      {
+        id: "FS-2026-0503-001",
+        date: "2026-05-03",
+        season: "2026春",
+        capturePlace: "东礁A区",
+        team: ["张三", "李四", "王五"],
+        weather: "晴，风力3级",
+        tide: "高潮 08:20，潮高2.1m",
+        capturedCount: 15,
+        releasedCount: 15,
+        notes: "鸟群活跃度高，无异常情况",
+        createdAt: "2026-05-03T10:00:00.000Z",
+        updatedAt: "2026-05-03T18:00:00.000Z"
+      },
+      {
+        id: "FS-2026-0611-001",
+        date: "2026-06-11",
+        season: "2026春",
+        capturePlace: "东礁B区",
+        team: ["张三", "李四"],
+        weather: "多云，风力4级",
+        tide: "低潮 10:15，潮高0.8m",
+        capturedCount: 8,
+        releasedCount: 8,
+        notes: "部分个体处于换羽期",
+        createdAt: "2026-06-11T08:00:00.000Z",
+        updatedAt: "2026-06-11T16:30:00.000Z"
+      }
+    ]
+  },
+  ringInventory: {
+    batches: [
+      {
+        id: "BATCH-2026-SPRING-001",
+        prefix: "SB",
+        startNo: 26000,
+        endNo: 26999,
+        season: "2026春",
+        description: "2026年春季黑尾鸥环志批次",
+        createdAt: "2026-01-15T00:00:00.000Z"
+      }
+    ],
+    rings: [
+      {
+        ringNo: "SB-26001",
+        batchId: "BATCH-2026-SPRING-001",
+        status: "allocated",
+        allocatedTo: "SB-26001",
+        allocatedAt: "2026-05-03T00:00:00.000Z"
+      },
+      {
+        ringNo: "SB-26002",
+        batchId: "BATCH-2026-SPRING-001",
+        status: "available",
+        allocatedTo: null,
+        allocatedAt: null
+      }
+    ]
+  },
+  auditLogs: {
+    logs: []
   }
 };
 
@@ -73,7 +158,8 @@ let migrationState = {
   hasMigrated: false,
   legacyFilePresent: false,
   migratedAt: null,
-  migrationDetails: null
+  migrationDetails: null,
+  consistencyCheck: null
 };
 
 async function ensureDataDir() {
@@ -82,12 +168,52 @@ async function ensureDataDir() {
   }
 }
 
+async function cleanupOrphanTempFiles() {
+  try {
+    const tempPattern = join(DATA_DIR, "*.tmp.*");
+    const tempFiles = [];
+    for await (const entry of glob(tempPattern)) {
+      tempFiles.push(entry);
+    }
+    for (const f of tempFiles) {
+      try {
+        await unlink(f);
+        console.log(`[dataStore] 清理孤儿临时文件: ${f.split("/").pop()}`);
+      } catch (_) {}
+    }
+    if (tempFiles.length > 0) {
+      console.log(`[dataStore] 共清理 ${tempFiles.length} 个孤儿临时文件`);
+    }
+  } catch (_) {}
+}
+
+function generateTempPath(filePath) {
+  return `${filePath}.tmp.${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 async function atomicWriteFile(filePath, data) {
-  const tempPath = `${filePath}.tmp.${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tempPath = generateTempPath(filePath);
   const jsonStr = JSON.stringify(data, null, 2);
   await ensureDataDir();
   await writeFile(tempPath, jsonStr, "utf8");
   await rename(tempPath, filePath);
+}
+
+async function atomicWriteMulti(fileMap) {
+  const entries = Array.isArray(fileMap)
+    ? fileMap.map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath) }))
+    : Object.entries(fileMap).map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath) }));
+
+  await ensureDataDir();
+
+  for (const { tempPath, data } of entries) {
+    const jsonStr = JSON.stringify(data, null, 2);
+    await writeFile(tempPath, jsonStr, "utf8");
+  }
+
+  for (const { tempPath, filePath } of entries) {
+    await rename(tempPath, filePath);
+  }
 }
 
 async function readJsonSafely(filePath, defaultValue) {
@@ -140,30 +266,142 @@ function reassembleBirdFromEvents(birdRecord, allEvents) {
   return assembled;
 }
 
+async function verifyAndRepairConsistency() {
+  const result = {
+    checkedAt: new Date().toISOString(),
+    issues: [],
+    repaired: false,
+    summary: null
+  };
+
+  try {
+    const birdsStore = await readJsonSafely(STORE_FILES.birds, null);
+    const eventsStore = await readJsonSafely(STORE_FILES.events, null);
+
+    if (!birdsStore || !eventsStore) {
+      result.issues.push("store_files_missing");
+      migrationState.consistencyCheck = result;
+      return result;
+    }
+
+    const birds = birdsStore.birds || [];
+    const events = eventsStore.events || [];
+    const birdRingNos = new Set(birds.map(b => b.ringNo));
+
+    const orphanEvents = events.filter(e => !birdRingNos.has(e.ringNo));
+    if (orphanEvents.length > 0) {
+      result.issues.push(`orphan_events: ${orphanEvents.length}`);
+    }
+
+    const birdsByRing = new Map(birds.map(b => [b.ringNo, b]));
+    const eventsByBirdAndType = new Map();
+    for (const e of events) {
+      const key = `${e.ringNo}|${e.eventType}`;
+      if (!eventsByBirdAndType.has(key)) eventsByBirdAndType.set(key, []);
+      eventsByBirdAndType.get(key).push(e);
+    }
+
+    for (const [ringNo, bird] of birdsByRing) {
+      for (const type of EVENT_TYPES) {
+        const key = `${ringNo}|${type}`;
+        const birdEvents = eventsByBirdAndType.get(key) || [];
+        if (birdEvents.length === 0) continue;
+
+        const sorted = [...birdEvents].sort((a, b) => a.eventIndex - b.eventIndex);
+        for (let i = 0; i < sorted.length; i++) {
+          if (sorted[i].eventIndex !== i) {
+            result.issues.push(`index_gap: ${ringNo}.${type} expected ${i} got ${sorted[i].eventIndex}`);
+          }
+        }
+      }
+    }
+
+    const eventRingNos = new Set(events.map(e => e.ringNo));
+    const birdsWithoutEvents = birds.filter(b =>
+      !eventRingNos.has(b.ringNo) && b.healthRisk && typeof b.healthRisk === "object" && b.healthRisk.score > 50
+    );
+    if (birdsWithoutEvents.length > 0) {
+      result.issues.push(`high_risk_birds_no_events: ${birdsWithoutEvents.map(b => b.ringNo).join(",")}`);
+    }
+
+    if (result.issues.length > 0 && existsSync(STORE_FILES.legacySeabirds)) {
+      console.log(`[dataStore] 检测到 ${result.issues.length} 个一致性问题，尝试从旧文件自动修复`);
+      const legacy = await readJsonSafely(STORE_FILES.legacySeabirds, null);
+      if (legacy && legacy.birds && legacy.birds.length > 0) {
+        const legacyBirds = legacy.birds;
+        const newBirds = [];
+        const newEvents = [];
+        for (const lb of legacyBirds) {
+          const { bird, events } = splitLegacyBirdToEvents(lb);
+          newBirds.push(bird);
+          newEvents.push(...events);
+        }
+
+        await atomicWriteMulti([
+          [STORE_FILES.birds, { birds: newBirds }],
+          [STORE_FILES.events, { events: newEvents }]
+        ]);
+
+        result.repaired = true;
+        result.issues.push("auto_repaired_from_legacy");
+        console.log(`[dataStore] 自动修复完成，重建 ${newBirds.length} birds, ${newEvents.length} events`);
+
+        birdsStore.birds = newBirds;
+        eventsStore.events = newEvents;
+        birds.length = 0;
+        birds.push(...newBirds);
+        events.length = 0;
+        events.push(...newEvents);
+        birdRingNos.clear();
+        newBirds.forEach(b => birdRingNos.add(b.ringNo));
+        orphanEvents.length = 0;
+      }
+    }
+
+    result.summary = {
+      totalBirds: birds.length,
+      totalEvents: events.length,
+      orphanEventCount: orphanEvents.length,
+      birdRingNos: Array.from(birdRingNos)
+    };
+
+    migrationState.consistencyCheck = result;
+
+    if (result.issues.length > 0 && !result.repaired) {
+      console.warn(`[dataStore] 一致性问题: ${JSON.stringify(result.issues)}`);
+    } else if (result.issues.length === 0) {
+      console.log(`[dataStore] 一致性检查通过: ${result.summary.totalBirds} birds, ${result.summary.totalEvents} events`);
+    }
+  } catch (e) {
+    result.issues.push(`check_error: ${e.message}`);
+    console.error(`[dataStore] 一致性检查失败:`, e.message);
+  }
+
+  return result;
+}
+
 async function performMigration() {
   const legacyPath = STORE_FILES.legacySeabirds;
   const legacyExists = existsSync(legacyPath);
   migrationState.legacyFilePresent = legacyExists;
 
-  const birdsPath = STORE_FILES.birds;
-  const eventsPath = STORE_FILES.events;
-  const reportsPath = STORE_FILES.reports;
+  const missingStores = [];
+  for (const storeName of STORE_ORDER) {
+    if (!existsSync(STORE_FILES[storeName])) {
+      missingStores.push(storeName);
+    }
+  }
 
-  const birdsExist = existsSync(birdsPath);
-  const eventsExist = existsSync(eventsPath);
-  const reportsExist = existsSync(reportsPath);
-
-  if (birdsExist && eventsExist && reportsExist) {
+  if (missingStores.length === 0) {
     return;
   }
 
+  console.log(`[dataStore] 检测到缺失文件: ${missingStores.join(", ")}，开始初始化`);
   await ensureDataDir();
 
-  let birdsData;
-  let eventsData;
-  let reportsData;
+  const writeBatch = [];
 
-  if (legacyExists) {
+  if (legacyExists && (missingStores.includes("birds") || missingStores.includes("events"))) {
     const legacy = await readJsonSafely(legacyPath, { birds: [] });
     const legacyBirds = legacy.birds || [];
 
@@ -175,9 +413,15 @@ async function performMigration() {
       newEvents.push(...events);
     }
 
-    birdsData = { birds: newBirds };
-    eventsData = { events: newEvents };
-    reportsData = JSON.parse(JSON.stringify(SEED_REPORTS));
+    if (missingStores.includes("birds")) {
+      writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
+    }
+    if (missingStores.includes("events")) {
+      writeBatch.push([STORE_FILES.events, { events: newEvents }]);
+    }
+    if (missingStores.includes("reports")) {
+      writeBatch.push([STORE_FILES.reports, JSON.parse(JSON.stringify(SEED_DATA.reports))]);
+    }
 
     migrationState.hasMigrated = true;
     migrationState.migratedAt = new Date().toISOString();
@@ -187,21 +431,54 @@ async function performMigration() {
       migratedEventCount: newEvents.length
     };
   } else {
-    birdsData = JSON.parse(JSON.stringify(SEED_BIRDS));
-    eventsData = JSON.parse(JSON.stringify(SEED_EVENTS));
-    reportsData = JSON.parse(JSON.stringify(SEED_REPORTS));
+    for (const storeName of missingStores) {
+      if (storeName === "birds" || storeName === "events" || storeName === "reports") {
+        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
+      } else {
+        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
+      }
+    }
   }
 
-  await atomicWriteFile(birdsPath, birdsData);
-  await atomicWriteFile(eventsPath, eventsData);
-  await atomicWriteFile(reportsPath, reportsData);
+  const dictSeedIdx = writeBatch.findIndex(([p]) => p === STORE_FILES.dictionaries);
+  if (dictSeedIdx !== -1 && legacyExists) {
+    const legacy = await readJsonSafely(legacyPath, { birds: [] });
+    const existingValues = { species: new Set(), capturePlace: new Set(), season: new Set() };
+    for (const b of legacy.birds || []) {
+      if (b.species) existingValues.species.add(b.species);
+      if (b.capturePlace) existingValues.capturePlace.add(b.capturePlace);
+      if (b.season) existingValues.season.add(b.season);
+    }
 
-  console.log(`[dataStore] 数据结构初始化完成 ${migrationState.hasMigrated ? `(从旧文件迁移: ${migrationState.migrationDetails.migratedBirdCount} birds, ${migrationState.migrationDetails.migratedEventCount} events)` : "(种子数据)"}`);
+    const sessionsSeed = SEED_DATA.fieldSessions.fieldSessions || [];
+    for (const s of sessionsSeed) {
+      if (s.season) existingValues.season.add(s.season);
+      if (s.capturePlace) existingValues.capturePlace.add(s.capturePlace);
+    }
+
+    const dict = { species: [], capturePlace: [], season: [] };
+    const mandatory = {
+      species: ["黑尾鸥"],
+      capturePlace: ["东礁A区", "东礁B区"],
+      season: ["2026春"]
+    };
+    for (const type of ["species", "capturePlace", "season"]) {
+      const values = new Set([...mandatory[type], ...existingValues[type]]);
+      for (const v of values) dict[type].push(buildDictEntry(v));
+    }
+    writeBatch[dictSeedIdx][1] = dict;
+  }
+
+  await atomicWriteMulti(writeBatch);
+
+  console.log(`[dataStore] 数据结构初始化完成 (${migrationState.hasMigrated ? `从旧文件迁移: ${migrationState.migrationDetails.migratedBirdCount} birds, ${migrationState.migrationDetails.migratedEventCount} events` : `种子数据, ${missingStores.length} 个文件`})`);
 }
 
 async function initialize() {
   await ensureDataDir();
+  await cleanupOrphanTempFiles();
   await performMigration();
+  await verifyAndRepairConsistency();
 }
 
 function getMigrationState() {
@@ -255,8 +532,17 @@ async function saveLegacyCompatibleDb(db) {
     newEvents.push(...events);
   }
 
-  await writeBirdsStore({ birds: newBirds });
-  await writeEventsStore({ events: newEvents });
+  await atomicWriteMulti([
+    [STORE_FILES.birds, { birds: newBirds }],
+    [STORE_FILES.events, { events: newEvents }]
+  ]);
+}
+
+async function writeBirdsAndEventsStore(birdsData, eventsData) {
+  await atomicWriteMulti([
+    [STORE_FILES.birds, birdsData],
+    [STORE_FILES.events, eventsData]
+  ]);
 }
 
 function eventsFromBirdSubrecords(ringNo, eventType, subrecords) {
@@ -309,7 +595,9 @@ function defaultForStore(storeName) {
 
 export {
   STORE_FILES,
+  STORE_ORDER,
   EVENT_TYPES,
+  SEED_DATA,
   initialize,
   getMigrationState,
   loadLegacyCompatibleDb,
@@ -320,13 +608,17 @@ export {
   writeBirdsStore,
   writeEventsStore,
   writeReportsStore,
+  writeBirdsAndEventsStore,
   splitLegacyBirdToEvents,
   reassembleBirdFromEvents,
   eventsFromBirdSubrecords,
   groupEventsByRing,
   readStore,
   writeStore,
+  atomicWriteMulti,
   defaultForStore,
   atomicWriteFile,
-  readJsonSafely
+  readJsonSafely,
+  verifyAndRepairConsistency,
+  cleanupOrphanTempFiles
 };

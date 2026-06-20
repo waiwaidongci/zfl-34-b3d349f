@@ -1,16 +1,9 @@
 import {
   initialize,
   readStore,
-  writeStore,
-  atomicWriteFile,
-  readJsonSafely
+  writeStore
 } from "./dataStore.js";
 import { randomUUID } from "node:crypto";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const auditLogPath = join(__dirname, "data", "auditLogs.json");
 
 export const OPERATION_TYPES = {
   BIRD_CREATE: "bird_create",
@@ -47,12 +40,7 @@ function generateLogId() {
 
 async function loadAuditLogs() {
   await initialize();
-  const data = await readStore("auditLogs");
-  if (!data.logs || data.logs.length === 0) {
-    await atomicWriteFile(auditLogPath, { logs: [] });
-    return { logs: [] };
-  }
-  return data;
+  return await readStore("auditLogs");
 }
 
 async function saveAuditLogs(data) {
