@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { syncAllocateRing } from "./ringInventory.js";
+import { persistRiskToBird } from "./healthRisk.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const birdsPath = join(__dirname, "data", "seabirds.json");
@@ -200,6 +201,7 @@ async function commitImport(previewId) {
       observations: []
     };
 
+    persistRiskToBird(bird);
     db.birds.push(bird);
     imported.push(bird);
     existingRingNos.add(rec.ringNo);

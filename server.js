@@ -16,6 +16,12 @@ import {
   getSessionDetail
 } from "./fieldSessions.js";
 import { handleMigrationRoutes } from "./migrationRoutes.js";
+import {
+  calculateBirdRisk,
+  getRiskSummary,
+  persistRiskToBird,
+  persistRiskToAllBirds
+} from "./healthRisk.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -207,6 +213,9 @@ const server = http.createServer(async (req, res) => {
         "GET /birds/:ringNo/tracks",
         "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures",
         "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases",
+        "POST /birds/:ringNo/health-risk/recalculate",
+        "GET /health-risk/report",
+        "POST /health-risk/recalculate-all",
         "GET /reports/recapture-rate?season=",
         "GET /reports/migration-summary?species=&season=",
         "POST /ring-inventory/batches", "GET /ring-inventory/batches",
@@ -249,26 +258,71 @@ const server = http.createServer(async (req, res) => {
         recaptures: [],
         observations: []
       };
+      persistRiskToBird(bird);
       db.birds.push(bird);
       await saveDb(db);
       await syncAllocateRing(input.ringNo, input.ringNo);
       return send(res, 201, bird);
     }
-    const actionMatch = url.pathname.match(/^\/birds\/([^/]+)\/(history|measurements|recaptures|observations|releases)$/);
+    const actionMatch = url.pathname.match(/^\/birds\/([^/]+)\/(history|measurements|recaptures|observations|releases|health-risk)$/);
     if (actionMatch) {
       const bird = db.birds.find(b => b.ringNo === decodeURIComponent(actionMatch[1]));
       if (!bird) return send(res, 404, { error: "bird_not_found" });
       const action = actionMatch[2];
-      if (req.method === "GET" && action === "history") return send(res, 200, bird);
-      if (req.method === "POST" && action !== "history") {
+      if (req.method === "GET" && action === "history") {
+        const responseBird = { ...bird };
+        return send(res, 200, responseBird);
+      }
+      if (req.method === "POST" && action === "health-risk") {
+        const risk = calculateBirdRisk(bird);
+        bird.healthRisk = risk;
+        await saveDb(db);
+        return send(res, 200, { ringNo: bird.ringNo, healthRisk: risk });
+      }
+      if (req.method === "POST" && action !== "history" && action !== "health-risk") {
         const input = await body(req);
         bird[action].push({
           at: input.at || (action === "measurements" ? new Date().toISOString().slice(0, 10) : new Date().toISOString()),
           ...input
         });
+        persistRiskToBird(bird);
         await saveDb(db);
         return send(res, 201, bird);
       }
+    }
+
+    const healthRiskRecalcMatch = url.pathname.match(/^\/birds\/([^/]+)\/health-risk\/recalculate$/);
+    if (healthRiskRecalcMatch && req.method === "POST") {
+      const bird = db.birds.find(b => b.ringNo === decodeURIComponent(healthRiskRecalcMatch[1]));
+      if (!bird) return send(res, 404, { error: "bird_not_found" });
+      const risk = calculateBirdRisk(bird);
+      bird.healthRisk = risk;
+      await saveDb(db);
+      return send(res, 200, {
+        ringNo: bird.ringNo,
+        species: bird.species,
+        healthRisk: risk
+      });
+    }
+
+    if (req.method === "GET" && url.pathname === "/health-risk/report") {
+      const summary = getRiskSummary(db.birds);
+      return send(res, 200, summary);
+    }
+
+    if (req.method === "POST" && url.pathname === "/health-risk/recalculate-all") {
+      persistRiskToAllBirds(db.birds);
+      await saveDb(db);
+      const summary = getRiskSummary(db.birds);
+      return send(res, 200, {
+        message: "已重新计算全库健康风险",
+        recalculatedCount: db.birds.length,
+        summary: {
+          total: summary.total,
+          byLevel: summary.byLevel,
+          byFactorType: summary.byFactorType
+        }
+      });
     }
     if (req.method === "GET" && url.pathname === "/reports/recapture-rate") {
       const season = url.searchParams.get("season");

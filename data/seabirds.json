@@ -38,7 +38,22 @@
           "point": "N30.1,E122.3",
           "note": "近岸盘旋"
         }
-      ]
+      ],
+      "healthRisk": {
+        "ringNo": "SB-26001",
+        "species": "黑尾鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T10:19:04.557Z",
+        "latestMeasurement": {
+          "at": "2026-05-03",
+          "wing": 328,
+          "weight": 512,
+          "bill": 44,
+          "fieldSessionId": "FS-2026-0503-001"
+        }
+      }
     },
     {
       "ringNo": "SB-26005",
@@ -59,7 +74,22 @@
       ],
       "releases": [],
       "recaptures": [],
-      "observations": []
+      "observations": [],
+      "healthRisk": {
+        "ringNo": "SB-26005",
+        "species": "黑尾鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "latestMeasurement": {
+          "wing": 325,
+          "weight": 505,
+          "bill": 44,
+          "at": "2026-06-20",
+          "fieldSessionId": null
+        }
+      }
     },
     {
       "ringNo": "SB-26006",
@@ -80,7 +110,22 @@
       ],
       "releases": [],
       "recaptures": [],
-      "observations": []
+      "observations": [],
+      "healthRisk": {
+        "ringNo": "SB-26006",
+        "species": "红嘴鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "latestMeasurement": {
+          "wing": 280,
+          "weight": 320,
+          "bill": 35,
+          "at": "2026-06-20",
+          "fieldSessionId": null
+        }
+      }
     },
     {
       "ringNo": "SB-26008",
@@ -93,7 +138,22 @@
       "measurements": [],
       "releases": [],
       "recaptures": [],
-      "observations": []
+      "observations": [],
+      "healthRisk": {
+        "ringNo": "SB-26008",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "latestMeasurement": null
+      }
     }
   ]
 }
