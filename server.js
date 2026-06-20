@@ -15,6 +15,7 @@ import {
   getSessionSummary,
   getSessionDetail
 } from "./fieldSessions.js";
+import { handleMigrationRoutes } from "./migrationRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -73,6 +74,9 @@ const server = http.createServer(async (req, res) => {
       const handled = await handleRingInventoryRoutes(req, res, url, body);
       if (handled !== false) return;
     }
+
+    const migrationHandled = handleMigrationRoutes(req, res, url, db, send);
+    if (migrationHandled !== false) return;
 
     if (url.pathname.startsWith("/import")) {
       if (req.method === "POST" && url.pathname === "/import/preview") {
@@ -200,9 +204,11 @@ const server = http.createServer(async (req, res) => {
       endpoints: [
         "GET /birds", "POST /birds",
         "GET /birds/:ringNo/history",
+        "GET /birds/:ringNo/tracks",
         "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures",
         "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases",
         "GET /reports/recapture-rate?season=",
+        "GET /reports/migration-summary?species=&season=",
         "POST /ring-inventory/batches", "GET /ring-inventory/batches",
         "GET /ring-inventory/rings", "GET /ring-inventory/rings/available",
         "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next",
