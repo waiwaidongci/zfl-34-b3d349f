@@ -498,6 +498,7 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
 返回作业场次基本信息，以及：
 - `relatedBirds`：在该场次首次环志的鸟类档案（过滤出属于该场次的子记录）
 - `recapturedBirds`：在该场次被复捕、但并非本场次首次环志的鸟
+- `dataValidation`：对比填报的 `capturedCount`、`releasedCount` 与鸟档案/事件计算值，并列出引用本场次但鸟档案主场次不一致的事件
 
 响应（200）：
 ```json
@@ -529,7 +530,24 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
       ]
     }
   ],
-  "recapturedBirds": []
+  "recapturedBirds": [],
+  "dataValidation": {
+    "capturedCount": {
+      "reported": 15,
+      "computed": 2,
+      "diff": -13,
+      "breakdown": {
+        "newBirds": 2,
+        "recaptures": 0
+      }
+    },
+    "releasedCount": {
+      "reported": 15,
+      "computed": 2,
+      "diff": -13
+    },
+    "mismatchedFieldSessionEvents": []
+  }
 }
 ```
 
@@ -573,6 +591,7 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
 - `observations`：本场次关联的观察记录数
 - `releases`：本场次关联的放飞记录数
 - `speciesBreakdown`：按物种分组的环志数/复捕数
+- `dataValidation`：核对填报捕获/放飞数量与鸟档案、事件计算结果，摘要中返回主场次不一致事件数量
 
 响应示例（200）：
 ```json
@@ -597,9 +616,38 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
       "speciesBreakdown": [
         { "species": "黑尾鸥", "banded": 1, "recaptured": 0 }
       ]
+    },
+    "dataValidation": {
+      "capturedCount": {
+        "reported": 15,
+        "computed": 2,
+        "diff": -13,
+        "breakdown": {
+          "newBirds": 2,
+          "recaptures": 0
+        }
+      },
+      "releasedCount": {
+        "reported": 15,
+        "computed": 2,
+        "diff": -13
+      },
+      "mismatchedFieldSessionEventCount": 0
     }
   }
 ]
+```
+
+**数据核对验证示例：**
+
+```bash
+# 查看单场次核对结果，包含数量差异和主场次不一致事件列表
+curl -s http://localhost:3034/field-sessions/FS-2026-0611-001/detail \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps(d['dataValidation'], ensure_ascii=False, indent=2))"
+
+# 查看摘要中的核对结果，包含各场次的数量差异和主场次不一致事件数量
+curl -s http://localhost:3034/field-sessions/summary \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps([{'id': x['id'], 'dataValidation': x['dataValidation']} for x in d], ensure_ascii=False, indent=2))"
 ```
 
 ### 7. 鸟类记录关联作业场次
