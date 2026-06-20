@@ -2,6 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  OPERATION_TYPES,
+  TARGET_TYPES,
+  recordAuditLog,
+  pickSessionKeyFields
+} from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sessionsPath = join(__dirname, "data", "fieldSessions.json");
@@ -89,6 +95,14 @@ async function createSession(input) {
   };
   sessions.fieldSessions.push(session);
   await saveSessions(sessions);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.SESSION_CREATE,
+    targetType: TARGET_TYPES.SESSION,
+    targetId: session.id,
+    requestSummary: { date: input.date, season: input.season, capturePlace: input.capturePlace, team: input.team, capturedCount: input.capturedCount, releasedCount: input.releasedCount },
+    before: null,
+    after: pickSessionKeyFields(session)
+  });
   return session;
 }
 
@@ -118,6 +132,7 @@ async function updateSession(id, input) {
   const idx = sessions.fieldSessions.findIndex(s => s.id === id);
   if (idx === -1) throw new Error("session_not_found");
   const existing = sessions.fieldSessions[idx];
+  const beforeSession = pickSessionKeyFields(existing);
   const updated = {
     ...existing,
     ...input,
@@ -128,6 +143,14 @@ async function updateSession(id, input) {
   if (input.date) updated.date = normalizeDate(input.date);
   sessions.fieldSessions[idx] = updated;
   await saveSessions(sessions);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.SESSION_UPDATE,
+    targetType: TARGET_TYPES.SESSION,
+    targetId: id,
+    requestSummary: input,
+    before: beforeSession,
+    after: pickSessionKeyFields(updated)
+  });
   return updated;
 }
 
@@ -135,8 +158,18 @@ async function deleteSession(id) {
   const sessions = await loadSessions();
   const idx = sessions.fieldSessions.findIndex(s => s.id === id);
   if (idx === -1) throw new Error("session_not_found");
+  const existing = sessions.fieldSessions[idx];
+  const beforeSession = pickSessionKeyFields(existing);
   sessions.fieldSessions.splice(idx, 1);
   await saveSessions(sessions);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.SESSION_DELETE,
+    targetType: TARGET_TYPES.SESSION,
+    targetId: id,
+    requestSummary: { id },
+    before: beforeSession,
+    after: null
+  });
   return true;
 }
 

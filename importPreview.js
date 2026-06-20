@@ -6,6 +6,12 @@ import { randomUUID } from "node:crypto";
 import { syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
 import { validateDictionaryValue, validateDictionaryValues } from "./dictionaries.js";
+import {
+  OPERATION_TYPES,
+  TARGET_TYPES,
+  recordAuditLog,
+  pickBirdKeyFields
+} from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const birdsPath = join(__dirname, "data", "seabirds.json");
@@ -242,6 +248,16 @@ async function commitImport(previewId) {
 
   preview.status = "committed";
   preview.committedAt = new Date().toISOString();
+
+  const importedRingNos = imported.map(b => b.ringNo);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.BIRD_BATCH_IMPORT,
+    targetType: TARGET_TYPES.BIRD,
+    targetId: previewId,
+    requestSummary: { previewId, importedCount: imported.length, skippedCount: skipped.length, importedRingNos, skippedDetails: skipped },
+    before: null,
+    after: imported.map(b => pickBirdKeyFields(b))
+  });
 
   return {
     previewId,

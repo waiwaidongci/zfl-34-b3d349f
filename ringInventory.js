@@ -2,6 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  OPERATION_TYPES,
+  TARGET_TYPES,
+  recordAuditLog,
+  pickRingKeyFields
+} from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const inventoryPath = join(__dirname, "data", "ringInventory.json");
@@ -105,6 +111,15 @@ async function createBatch({ prefix, startNo, endNo, season, description }) {
   inventory.rings.push(...newRings);
   await saveInventory(inventory);
 
+  recordAuditLog({
+    operationType: OPERATION_TYPES.RING_BATCH_CREATE,
+    targetType: TARGET_TYPES.RING_BATCH,
+    targetId: batchId,
+    requestSummary: { prefix, startNo, endNo, season, description, generated: newRings.length, conflicts: conflictRings.length },
+    before: null,
+    after: { id: batchId, prefix, startNo, endNo, season, totalGenerated: newRings.length }
+  });
+
   return { batch, generated: newRings.length, conflicts: conflictRings };
 }
 
@@ -161,11 +176,20 @@ async function allocateRing({ ringNo, allocatedTo, season }) {
     throw new Error("ring_already_allocated");
   }
 
+  const beforeRing = pickRingKeyFields(ring);
   ring.status = "allocated";
   ring.allocatedTo = allocatedTo;
   ring.allocatedAt = new Date().toISOString();
 
   await saveInventory(inventory);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.RING_ALLOCATE,
+    targetType: TARGET_TYPES.RING,
+    targetId: ringNo,
+    requestSummary: { ringNo, allocatedTo, season },
+    before: beforeRing,
+    after: pickRingKeyFields(ring)
+  });
   return ring;
 }
 
@@ -181,11 +205,20 @@ async function releaseRing(ringNo) {
     throw new Error("ring_still_used_by_bird");
   }
 
+  const beforeRing = pickRingKeyFields(ring);
   ring.status = "available";
   ring.allocatedTo = null;
   ring.allocatedAt = null;
 
   await saveInventory(inventory);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.RING_RELEASE,
+    targetType: TARGET_TYPES.RING,
+    targetId: ringNo,
+    requestSummary: { ringNo },
+    before: beforeRing,
+    after: pickRingKeyFields(ring)
+  });
   return ring;
 }
 
@@ -204,10 +237,19 @@ async function syncAllocateRing(ringNo, allocatedTo) {
   if (ring.status === "allocated") {
     throw new Error("ring_already_allocated");
   }
+  const beforeRing = pickRingKeyFields(ring);
   ring.status = "allocated";
   ring.allocatedTo = allocatedTo || ringNo;
   ring.allocatedAt = new Date().toISOString();
   await saveInventory(inventory);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.RING_ALLOCATE,
+    targetType: TARGET_TYPES.RING,
+    targetId: ringNo,
+    requestSummary: { ringNo, allocatedTo: allocatedTo || ringNo, sync: true },
+    before: beforeRing,
+    after: pickRingKeyFields(ring)
+  });
   return ring;
 }
 

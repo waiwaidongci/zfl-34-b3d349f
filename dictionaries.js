@@ -2,6 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  OPERATION_TYPES,
+  TARGET_TYPES,
+  recordAuditLog,
+  pickDictEntryKeyFields
+} from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dictPath = join(__dirname, "data", "dictionaries.json");
@@ -111,6 +117,14 @@ async function addDictionaryEntry(type, value, description = null) {
   const entry = buildEntry(value, description);
   dict[type].push(entry);
   await saveDictionaries(dict);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.DICTIONARY_ENTRY_ADD,
+    targetType: TARGET_TYPES.DICTIONARY,
+    targetId: `${type}:${value}`,
+    requestSummary: { type, value, description },
+    before: null,
+    after: { type, ...pickDictEntryKeyFields(entry) }
+  });
   return entry;
 }
 
@@ -120,6 +134,7 @@ async function updateDictionaryEntry(type, oldValue, newValue, description) {
   const dict = await loadDictionaries();
   const entry = findEntry(dict, type, oldValue);
   if (!entry) throw new Error("entry_not_found");
+  const beforeEntry = { type, ...pickDictEntryKeyFields(entry) };
   if (newValue !== undefined && newValue !== null) {
     if (typeof newValue !== "string" || newValue.trim().length === 0) throw new Error("invalid_new_value");
     if (newValue !== oldValue && findEntry(dict, type, newValue)) throw new Error("entry_already_exists");
@@ -128,6 +143,14 @@ async function updateDictionaryEntry(type, oldValue, newValue, description) {
   if (description !== undefined) entry.description = description;
   entry.updatedAt = nowIso();
   await saveDictionaries(dict);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.DICTIONARY_ENTRY_UPDATE,
+    targetType: TARGET_TYPES.DICTIONARY,
+    targetId: `${type}:${newValue || oldValue}`,
+    requestSummary: { type, oldValue, newValue, description },
+    before: beforeEntry,
+    after: { type, ...pickDictEntryKeyFields(entry) }
+  });
   return entry;
 }
 
@@ -137,8 +160,18 @@ async function deleteDictionaryEntry(type, value) {
   const dict = await loadDictionaries();
   const idx = (dict[type] || []).findIndex(e => e.value === value);
   if (idx === -1) throw new Error("entry_not_found");
+  const existing = dict[type][idx];
+  const beforeEntry = { type, ...pickDictEntryKeyFields(existing) };
   dict[type].splice(idx, 1);
   await saveDictionaries(dict);
+  recordAuditLog({
+    operationType: OPERATION_TYPES.DICTIONARY_ENTRY_DELETE,
+    targetType: TARGET_TYPES.DICTIONARY,
+    targetId: `${type}:${value}`,
+    requestSummary: { type, value },
+    before: beforeEntry,
+    after: null
+  });
   return true;
 }
 

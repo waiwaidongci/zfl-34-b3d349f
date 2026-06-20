@@ -33,6 +33,14 @@ import {
   validateDictionaryValues,
   mapDictError
 } from "./dictionaries.js";
+import {
+  OPERATION_TYPES,
+  TARGET_TYPES,
+  recordAuditLog,
+  queryAuditLogs,
+  getAuditLogStats,
+  pickBirdKeyFields
+} from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -334,7 +342,9 @@ const server = http.createServer(async (req, res) => {
         "GET /field-sessions/summary", "GET /field-sessions/:id/detail",
         "POST /import/preview", "GET /import/preview/:previewId", "POST /import/commit/:previewId",
         "GET /dictionaries", "GET /dictionaries/:type", "POST /dictionaries/:type",
-        "PUT /dictionaries/:type/:value", "DELETE /dictionaries/:type/:value"
+        "PUT /dictionaries/:type/:value", "DELETE /dictionaries/:type/:value",
+        "GET /audit-logs?dateFrom=&dateTo=&operationType=&ringNo=&targetId=&limit=&offset=",
+        "GET /audit-logs/stats"
       ]
     });
 
@@ -378,6 +388,14 @@ const server = http.createServer(async (req, res) => {
       db.birds.push(bird);
       await saveDb(db);
       await syncAllocateRing(input.ringNo, input.ringNo);
+      recordAuditLog({
+        operationType: OPERATION_TYPES.BIRD_CREATE,
+        targetType: TARGET_TYPES.BIRD,
+        targetId: bird.ringNo,
+        requestSummary: { ringNo: input.ringNo, species: input.species, sex: input.sex, age: input.age, capturePlace: input.capturePlace, season: input.season },
+        before: null,
+        after: pickBirdKeyFields(bird)
+      });
       return send(res, 201, bird);
     }
     const actionMatch = url.pathname.match(/^\/birds\/([^/]+)\/(history|measurements|recaptures|observations|releases|health-risk)$/);
@@ -390,9 +408,18 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, responseBird);
       }
       if (req.method === "POST" && action === "health-risk") {
+        const beforeBird = pickBirdKeyFields(bird);
         const risk = calculateBirdRisk(bird);
         bird.healthRisk = risk;
         await saveDb(db);
+        recordAuditLog({
+          operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
+          targetType: TARGET_TYPES.BIRD,
+          targetId: bird.ringNo,
+          requestSummary: { action: "recalculate_health_risk" },
+          before: beforeBird,
+          after: pickBirdKeyFields(bird)
+        });
         return send(res, 200, { ringNo: bird.ringNo, healthRisk: risk });
       }
       if (req.method === "POST" && action !== "history" && action !== "health-risk") {
@@ -402,12 +429,28 @@ const server = http.createServer(async (req, res) => {
           const placeDictError = buildDictValidationError([placeValidation]);
           if (placeDictError) return send(res, placeDictError.status, placeDictError);
         }
-        bird[action].push({
+        const beforeBird = pickBirdKeyFields(bird);
+        const newEntry = {
           at: input.at || (action === "measurements" ? new Date().toISOString().slice(0, 10) : new Date().toISOString()),
           ...input
-        });
+        };
+        bird[action].push(newEntry);
         persistRiskToBird(bird);
         await saveDb(db);
+        const opTypeMap = {
+          measurements: OPERATION_TYPES.BIRD_MEASUREMENT_APPEND,
+          recaptures: OPERATION_TYPES.BIRD_RECAPTURE_APPEND,
+          observations: OPERATION_TYPES.BIRD_OBSERVATION_APPEND,
+          releases: OPERATION_TYPES.BIRD_RELEASE_APPEND
+        };
+        recordAuditLog({
+          operationType: opTypeMap[action],
+          targetType: TARGET_TYPES.BIRD,
+          targetId: bird.ringNo,
+          requestSummary: { action, entry: newEntry },
+          before: beforeBird,
+          after: pickBirdKeyFields(bird)
+        });
         return send(res, 201, bird);
       }
     }
@@ -416,9 +459,18 @@ const server = http.createServer(async (req, res) => {
     if (healthRiskRecalcMatch && req.method === "POST") {
       const bird = db.birds.find(b => b.ringNo === decodeURIComponent(healthRiskRecalcMatch[1]));
       if (!bird) return send(res, 404, { error: "bird_not_found" });
+      const beforeBird = pickBirdKeyFields(bird);
       const risk = calculateBirdRisk(bird);
       bird.healthRisk = risk;
       await saveDb(db);
+      recordAuditLog({
+        operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
+        targetType: TARGET_TYPES.BIRD,
+        targetId: bird.ringNo,
+        requestSummary: { action: "recalculate_health_risk_explicit" },
+        before: beforeBird,
+        after: pickBirdKeyFields(bird)
+      });
       return send(res, 200, {
         ringNo: bird.ringNo,
         species: bird.species,
@@ -435,6 +487,14 @@ const server = http.createServer(async (req, res) => {
       persistRiskToAllBirds(db.birds);
       await saveDb(db);
       const summary = getRiskSummary(db.birds);
+      recordAuditLog({
+        operationType: OPERATION_TYPES.ALL_HEALTH_RISK_RECALCULATE,
+        targetType: TARGET_TYPES.SYSTEM,
+        targetId: "system",
+        requestSummary: { recalculatedCount: db.birds.length },
+        before: null,
+        after: { total: summary.total, byLevel: summary.byLevel }
+      });
       return send(res, 200, {
         message: "已重新计算全库健康风险",
         recalculatedCount: db.birds.length,
@@ -456,6 +516,31 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, Object.values(bySpecies).map(row => ({ ...row, rate: row.banded ? Number((row.recaptured / row.banded).toFixed(3)) : 0 })));
     }
+
+    if (url.pathname.startsWith("/audit-logs")) {
+      if (req.method === "GET" && url.pathname === "/audit-logs") {
+        const dateFrom = url.searchParams.get("dateFrom");
+        const dateTo = url.searchParams.get("dateTo");
+        const operationType = url.searchParams.get("operationType");
+        const ringNo = url.searchParams.get("ringNo");
+        const targetId = url.searchParams.get("targetId");
+        const limitParam = url.searchParams.get("limit");
+        const offsetParam = url.searchParams.get("offset");
+        const limit = limitParam ? Number(limitParam) : undefined;
+        const offset = offsetParam ? Number(offsetParam) : undefined;
+        const result = await queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringNo, limit, offset });
+        return send(res, 200, result);
+      }
+      if (req.method === "GET" && url.pathname === "/audit-logs/stats") {
+        const stats = await getAuditLogStats();
+        return send(res, 200, {
+          ...stats,
+          operationTypes: Object.values(OPERATION_TYPES),
+          targetTypes: Object.values(TARGET_TYPES)
+        });
+      }
+    }
+
     send(res, 404, { error: "not_found" });
   } catch (error) {
     send(res, 500, { error: error.message });
