@@ -855,3 +855,228 @@ curl -s -X POST http://localhost:3034/birds \
 - `GET /field-sessions/:id` - 查询单场次详情（含关联鸟类）
 - `PUT /field-sessions/:id` - 更新作业场次
 - `DELETE /field-sessions/:id` - 删除作业场次
+
+---
+
+## 数据备份与恢复模块
+
+手动创建 `data/seabirds.json` 的快照、列出快照、查看快照摘要，并从指定快照恢复。恢复前系统会自动校验快照结构；恢复后现有 `GET /birds` 和统计接口（`GET /reports/recapture-rate`、`GET /health-risk/report` 等）必须能正常读取。
+
+### 数据存储
+
+快照文件存储在 `data/snapshots/` 目录，每个快照是一个独立 JSON 文件：
+
+```
+data/snapshots/
+├── index.json                    # 快照索引
+└── SNAP-20260620143000-a1b2c3d4.json   # 单个快照文件
+```
+
+快照文件内部结构：
+
+```json
+{
+  "_meta": {
+    "snapshotId": "SNAP-20260620143000-a1b2c3d4",
+    "createdAt": "2026-06-20T14:30:00.000Z",
+    "sourceFile": "data/seabirds.json",
+    "summary": {
+      "totalBirds": 4,
+      "speciesBreakdown": [
+        { "species": "黑尾鸥", "count": 3 },
+        { "species": "红嘴鸥", "count": 1 }
+      ],
+      "totalMeasurements": 3,
+      "totalRecaptures": 1,
+      "totalObservations": 1,
+      "totalReleases": 1
+    }
+  },
+  "data": {
+    "birds": [ ... ]
+  }
+}
+```
+
+### 校验规则
+
+创建快照时，系统会先校验当前 `data/seabirds.json` 的结构：
+
+- 根节点必须是对象，且包含 `birds` 数组
+- 每条鸟记录必须包含 `ringNo` 和 `species` 字段
+- 环号在快照内不可重复
+- `measurements`、`releases`、`recaptures`、`observations` 若存在必须为数组
+- `sex`、`age`、`capturePlace`、`season` 若存在必须为字符串
+
+恢复快照时，同样执行以上校验。若校验不通过，恢复操作会被拒绝，返回 422 错误和具体校验失败信息。
+
+### ⚠️ 危险操作警告
+
+**`POST /backups/snapshots/:id/restore` 是危险操作**，执行后会将 `data/seabirds.json` 整体替换为快照中的数据，当前所有未备份的变更将**不可恢复**。
+
+建议操作流程：
+
+1. 恢复前先 `POST /backups/snapshots` 创建当前数据的快照
+2. 使用 `GET /backups/snapshots/:id` 确认目标快照的摘要信息
+3. 确认无误后再调用 `POST /backups/snapshots/:id/restore`
+4. 恢复后立即调用 `GET /birds` 和统计接口验证数据可正常读取
+
+### 1. 创建快照
+
+**POST /backups/snapshots**
+
+对当前 `data/seabirds.json` 创建一份快照。创建前会校验数据结构。
+
+响应（201）：
+
+```json
+{
+  "snapshotId": "SNAP-20260620143000-a1b2c3d4",
+  "createdAt": "2026-06-20T14:30:00.000Z",
+  "summary": {
+    "totalBirds": 4,
+    "speciesBreakdown": [
+      { "species": "黑尾鸥", "count": 3 },
+      { "species": "红嘴鸥", "count": 1 }
+    ],
+    "totalMeasurements": 3,
+    "totalRecaptures": 1,
+    "totalObservations": 1,
+    "totalReleases": 1
+  }
+}
+```
+
+错误响应：
+
+| HTTP状态 | 错误码 | 说明 |
+|----------|--------|------|
+| 404 | `db_not_found` | 数据文件不存在 |
+| 500 | `db_parse_error` | 数据文件解析失败 |
+| 422 | `db_structure_invalid` | 当前数据结构校验不通过 |
+
+### 2. 列出所有快照
+
+**GET /backups/snapshots**
+
+响应（200）：
+
+```json
+[
+  {
+    "snapshotId": "SNAP-20260620143000-a1b2c3d4",
+    "createdAt": "2026-06-20T14:30:00.000Z",
+    "summary": {
+      "totalBirds": 4,
+      "speciesBreakdown": [ ... ],
+      "totalMeasurements": 3,
+      "totalRecaptures": 1,
+      "totalObservations": 1,
+      "totalReleases": 1
+    }
+  }
+]
+```
+
+### 3. 查看快照摘要
+
+**GET /backups/snapshots/:id**
+
+返回快照的摘要信息和结构校验结果。
+
+响应（200）：
+
+```json
+{
+  "snapshotId": "SNAP-20260620143000-a1b2c3d4",
+  "createdAt": "2026-06-20T14:30:00.000Z",
+  "summary": {
+    "totalBirds": 4,
+    "speciesBreakdown": [ ... ],
+    "totalMeasurements": 3,
+    "totalRecaptures": 1,
+    "totalObservations": 1,
+    "totalReleases": 1
+  },
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "stats": {
+      "totalBirds": 4,
+      "uniqueRingNos": 4
+    }
+  }
+}
+```
+
+404 响应：`{ "error": "snapshot_not_found", "message": "快照不存在" }`
+
+### 4. 从快照恢复（⚠️ 危险操作）
+
+**POST /backups/snapshots/:id/restore**
+
+⚠️ **此操作将用快照数据覆盖当前 `data/seabirds.json`，未备份的当前数据将丢失。建议恢复前先创建当前数据的快照。**
+
+恢复前会自动校验快照结构，校验不通过则拒绝恢复。
+
+响应（200）：
+
+```json
+{
+  "snapshotId": "SNAP-20260620143000-a1b2c3d4",
+  "restoredAt": "2026-06-20T15:00:00.000Z",
+  "summary": {
+    "totalBirds": 4,
+    "speciesBreakdown": [ ... ],
+    "totalMeasurements": 3,
+    "totalRecaptures": 1,
+    "totalObservations": 1,
+    "totalReleases": 1
+  }
+}
+```
+
+错误响应：
+
+| HTTP状态 | 错误码 | 说明 |
+|----------|--------|------|
+| 404 | `snapshot_not_found` | 快照不存在 |
+| 404 | `snapshot_file_missing` | 快照文件已丢失 |
+| 500 | `snapshot_file_corrupt` | 快照文件损坏，无法解析 |
+| 422 | `snapshot_data_missing` | 快照中缺少 data 字段 |
+| 422 | `snapshot_structure_invalid` | 快照结构校验不通过，附带 `validationErrors` 数组 |
+
+### curl 验证示例
+
+**1）创建快照**
+
+```bash
+curl -s -X POST http://localhost:3034/backups/snapshots | python3 -m json.tool
+```
+
+**2）列出所有快照**
+
+```bash
+curl -s http://localhost:3034/backups/snapshots | python3 -m json.tool
+```
+
+**3）查看快照摘要**
+
+```bash
+curl -s http://localhost:3034/backups/snapshots/<SNAPSHOT_ID> | python3 -m json.tool
+```
+
+**4）从快照恢复（危险操作，请先备份当前数据）**
+
+```bash
+# 步骤1：先备份当前数据
+curl -s -X POST http://localhost:3034/backups/snapshots | python3 -m json.tool
+
+# 步骤2：执行恢复（替换 <SNAPSHOT_ID>）
+curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m json.tool
+
+# 步骤3：验证恢复后数据可正常读取
+curl -s http://localhost:3034/birds | python3 -m json.tool
+curl -s http://localhost:3034/reports/recapture-rate | python3 -m json.tool
+curl -s http://localhost:3034/health-risk/report | python3 -m json.tool
+```

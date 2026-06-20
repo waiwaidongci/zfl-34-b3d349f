@@ -16,6 +16,7 @@ import {
   getSessionDetail
 } from "./fieldSessions.js";
 import { handleMigrationRoutes } from "./migrationRoutes.js";
+import { handleBackupRoutes } from "./backupRoutes.js";
 import {
   calculateBirdRisk,
   getRiskSummary,
@@ -119,6 +120,9 @@ const server = http.createServer(async (req, res) => {
 
     const migrationHandled = handleMigrationRoutes(req, res, url, db, send);
     if (migrationHandled !== false) return;
+
+    const backupHandled = await handleBackupRoutes(req, res, url, send);
+    if (backupHandled !== false) return;
 
     if (url.pathname.startsWith("/import")) {
       if (req.method === "POST" && url.pathname === "/import/preview") {
@@ -344,7 +348,9 @@ const server = http.createServer(async (req, res) => {
         "GET /dictionaries", "GET /dictionaries/:type", "POST /dictionaries/:type",
         "PUT /dictionaries/:type/:value", "DELETE /dictionaries/:type/:value",
         "GET /audit-logs?dateFrom=&dateTo=&operationType=&ringNo=&targetId=&limit=&offset=",
-        "GET /audit-logs/stats"
+        "GET /audit-logs/stats",
+        "POST /backups/snapshots", "GET /backups/snapshots",
+        "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/restore"
       ]
     });
 
