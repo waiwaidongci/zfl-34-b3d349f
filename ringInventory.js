@@ -176,6 +176,11 @@ async function releaseRing(ringNo) {
     throw new Error("ring_not_found");
   }
 
+  const birds = await loadBirds();
+  if (birds.birds.some(b => b.ringNo === ringNo)) {
+    throw new Error("ring_still_used_by_bird");
+  }
+
   ring.status = "available";
   ring.allocatedTo = null;
   ring.allocatedAt = null;
@@ -192,6 +197,27 @@ async function allocateNextAvailable({ batchId, allocatedTo, season }) {
   return await allocateRing({ ringNo: nextRing.ringNo, allocatedTo, season });
 }
 
+async function syncAllocateRing(ringNo, allocatedTo) {
+  const inventory = await loadInventory();
+  const ring = inventory.rings.find(r => r.ringNo === ringNo);
+  if (!ring) return null;
+  if (ring.status === "allocated") {
+    throw new Error("ring_already_allocated");
+  }
+  ring.status = "allocated";
+  ring.allocatedTo = allocatedTo || ringNo;
+  ring.allocatedAt = new Date().toISOString();
+  await saveInventory(inventory);
+  return ring;
+}
+
+async function isRingAllocated(ringNo) {
+  const inventory = await loadInventory();
+  const ring = inventory.rings.find(r => r.ringNo === ringNo);
+  if (!ring) return false;
+  return ring.status === "allocated";
+}
+
 export {
   createBatch,
   listBatches,
@@ -199,5 +225,7 @@ export {
   getNextAvailableRing,
   allocateRing,
   releaseRing,
-  allocateNextAvailable
+  allocateNextAvailable,
+  syncAllocateRing,
+  isRingAllocated
 };

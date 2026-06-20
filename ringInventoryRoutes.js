@@ -20,6 +20,7 @@ function errorMap(err) {
     case "ring_not_found": return { status: 404, error: "ring_not_found", message: "环号不存在" };
     case "ring_already_allocated": return { status: 409, error: "ring_already_allocated", message: "环号已被分配" };
     case "ring_already_used_in_birds": return { status: 409, error: "ring_already_used_in_birds", message: "环号已在 birds 记录中使用" };
+    case "ring_still_used_by_bird": return { status: 409, error: "ring_still_used_by_bird", message: "环号仍被鸟类记录占用，无法释放" };
     case "no_available_rings": return { status: 404, error: "no_available_rings", message: "没有可用的环号" };
     default: return { status: 500, error: "internal_error", message: err.message };
   }

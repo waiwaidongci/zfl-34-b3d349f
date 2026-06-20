@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
+import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -60,9 +61,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/birds") {
       const input = await body(req);
       if (db.birds.some(b => b.ringNo === input.ringNo)) return send(res, 409, { error: "ring_exists" });
+      if (await isRingAllocated(input.ringNo)) return send(res, 409, { error: "ring_allocated_in_inventory", message: "该环号在库存中已被占用" });
       const bird = { ringNo: input.ringNo, species: input.species, sex: input.sex || "unknown", age: input.age, capturePlace: input.capturePlace, season: input.season, measurements: input.measurements || [], releases: input.releases || [], recaptures: [], observations: [] };
       db.birds.push(bird);
       await saveDb(db);
+      await syncAllocateRing(input.ringNo, input.ringNo);
       return send(res, 201, bird);
     }
     const actionMatch = url.pathname.match(/^\/birds\/([^/]+)\/(history|measurements|recaptures|observations|releases)$/);
