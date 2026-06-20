@@ -148,7 +148,6 @@ async function queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringN
 
   const fromDate = normalizeDateFilter(dateFrom);
   const toDate = normalizeDateFilter(dateTo);
-  const searchTargetId = targetId || ringNo;
 
   if (fromDate) {
     logs = logs.filter(l => l.timestamp.slice(0, 10) >= fromDate);
@@ -159,8 +158,20 @@ async function queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringN
   if (operationType) {
     logs = logs.filter(l => l.operationType === operationType);
   }
-  if (searchTargetId) {
-    logs = logs.filter(l => l.targetId === searchTargetId);
+  if (targetId) {
+    logs = logs.filter(l => l.targetId === targetId);
+  }
+  if (ringNo) {
+    logs = logs.filter(l => {
+      if (l.targetId === ringNo) return true;
+      if (l.operationType === OPERATION_TYPES.BIRD_BATCH_IMPORT
+          && l.requestSummary
+          && Array.isArray(l.requestSummary.importedRingNos)
+          && l.requestSummary.importedRingNos.includes(ringNo)) {
+        return true;
+      }
+      return false;
+    });
   }
 
   logs = logs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
