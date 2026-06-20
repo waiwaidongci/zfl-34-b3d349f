@@ -470,6 +470,246 @@ npm start
 ### 统计报表
 - `GET /reports/recapture-rate?season=` - 按季节统计复捕率
 
+---
+
+## 导入预览 API
+
+批量导入海鸟环志记录的**两步式**流程：先提交校验 → 确认后写入。现有 `POST /birds` 手工录入流程不受影响。
+
+### 流程说明
+
+```
+提交一批 JSON  ──→  POST /import/preview  ──→  返回校验结果 + previewId
+                                                    │
+                                          ┌─────────┴──────────┐
+                                          │ 阻断性错误？        │
+                                          │ (缺字段/环号已存在)  │
+                                          └─────────┬──────────┘
+                                             否 ↓         ↓ 是
+                                    确认写入          修正后重新预览
+                              POST /import/commit/:id
+```
+
+### 校验规则
+
+| 检查项 | 类型 | 说明 |
+|--------|------|------|
+| 必填字段缺失 | 阻断 | 每条记录必须包含 `ringNo` 和 `species` |
+| 环号与数据库重复 | 阻断 | `ringNo` 不能与 `data/seabirds.json` 已有记录冲突 |
+| 批次内环号重复 | 警告 | 同一批次内出现相同 `ringNo`，仅提示不阻断 |
+| 缺失测量值 | 警告 | 没有 `measurements` 或为空数组，仅提示不阻断 |
+| 未知物种 | 警告 | `species` 不在已知物种列表中，仅提示不阻断 |
+
+### 已知物种列表
+
+内置已知物种：黑尾鸥、黑嘴鸥、遗鸥、红嘴鸥、普通燕鸥、白额圆尾鹱、黑叉尾海燕、大凤头燕鸥、粉红燕鸥、褐翅燕鸥、灰背鸥、海鸥、北极鸥、三趾鸥。
+
+数据库中已有的物种会自动加入已知列表。
+
+### 1. 提交预览
+
+**POST /import/preview**
+
+请求体：
+```json
+{
+  "records": [
+    {
+      "ringNo": "SB-26003",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "measurements": [{ "wing": 320, "weight": 498, "bill": 43 }]
+    },
+    {
+      "ringNo": "SB-26004",
+      "species": "黑嘴鸥",
+      "sex": "female",
+      "age": "subadult",
+      "capturePlace": "东礁B区",
+      "season": "2026春"
+    }
+  ]
+}
+```
+
+响应（200）：
+```json
+{
+  "previewId": "IMP-M1R2K3-abc123",
+  "status": "ready",
+  "validation": {
+    "totalRecords": 2,
+    "validRecords": 2,
+    "fieldErrors": [],
+    "duplicateInBatch": [],
+    "duplicateInDb": [],
+    "missingMeasurements": [
+      { "index": 1, "ringNo": "SB-26004" }
+    ],
+    "unknownSpecies": [],
+    "hasBlockingErrors": false
+  },
+  "createdAt": "2026-06-20T10:00:00.000Z"
+}
+```
+
+- `status` 为 `"ready"` 时可提交确认写入
+- `status` 为 `"blocked"` 时存在阻断性错误，需修正后重新提交预览
+
+### 2. 查看预览
+
+**GET /import/preview/:previewId**
+
+预览缓存有效期为 30 分钟，过期后需重新提交。
+
+响应（200）：
+```json
+{
+  "previewId": "IMP-M1R2K3-abc123",
+  "status": "ready",
+  "validation": { ... },
+  "createdAt": "2026-06-20T10:00:00.000Z",
+  "committedAt": null
+}
+```
+
+### 3. 确认写入
+
+**POST /import/commit/:previewId**
+
+确认后批量写入 `data/seabirds.json`，同时同步环号库存。每个 previewId 只能提交一次。
+
+响应（200）：
+```json
+{
+  "previewId": "IMP-M1R2K3-abc123",
+  "imported": 2,
+  "skipped": 0,
+  "skippedDetails": []
+}
+```
+
+### curl 验证示例
+
+**1）正常批量导入（无阻断错误）**
+
+```bash
+# 步骤1：提交预览
+curl -s -X POST http://localhost:3034/import/preview \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "records": [
+      {
+        "ringNo": "SB-26005",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "measurements": [{ "wing": 325, "weight": 505, "bill": 44 }]
+      },
+      {
+        "ringNo": "SB-26006",
+        "species": "红嘴鸥",
+        "sex": "female",
+        "age": "subadult",
+        "capturePlace": "东礁B区",
+        "season": "2026春",
+        "measurements": [{ "wing": 280, "weight": 320, "bill": 35 }]
+      }
+    ]
+  }' | python3 -m json.tool
+
+# 步骤2：记下返回的 previewId，确认写入（替换 <PREVIEW_ID>）
+curl -s -X POST http://localhost:3034/import/commit/<PREVIEW_ID> | python3 -m json.tool
+
+# 步骤3：验证写入结果
+curl -s http://localhost:3034/birds | python3 -m json.tool
+```
+
+**2）含阻断性错误的预览（重复环号 + 缺字段）**
+
+```bash
+curl -s -X POST http://localhost:3034/import/preview \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "records": [
+      {
+        "ringNo": "SB-26001",
+        "species": "黑尾鸥",
+        "age": "adult"
+      },
+      {
+        "species": "黑嘴鸥",
+        "age": "subadult"
+      }
+    ]
+  }' | python3 -m json.tool
+```
+
+预期返回 `status: "blocked"`，`duplicateInDb` 包含 `SB-26001`，`fieldErrors` 包含缺少 `ringNo` 的记录。
+
+**3）含警告但不阻断的预览（缺失测量值 + 未知物种）**
+
+```bash
+curl -s -X POST http://localhost:3034/import/preview \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "records": [
+      {
+        "ringNo": "SB-26007",
+        "species": "某种新海鸟",
+        "capturePlace": "西礁D区",
+        "season": "2026春"
+      }
+    ]
+  }' | python3 -m json.tool
+```
+
+预期返回 `status: "ready"`，`missingMeasurements` 和 `unknownSpecies` 有内容但不会阻断。
+
+**4）查看预览详情**
+
+```bash
+curl -s http://localhost:3034/import/preview/<PREVIEW_ID> | python3 -m json.tool
+```
+
+**5）重复提交已确认的预览**
+
+```bash
+curl -s -X POST http://localhost:3034/import/commit/<PREVIEW_ID> | python3 -m json.tool
+```
+
+预期返回 409 `already_committed`。
+
+**6）现有 POST /birds 流程不受影响**
+
+```bash
+curl -s -X POST http://localhost:3034/birds \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "ringNo": "SB-26008",
+    "species": "黑尾鸥",
+    "sex": "unknown",
+    "age": "juvenile",
+    "capturePlace": "东礁A区",
+    "season": "2026春"
+  }' | python3 -m json.tool
+```
+
+### 错误码说明（导入预览）
+
+| 错误码 | HTTP状态 | 说明 |
+|--------|----------|------|
+| `invalid_input` | 400 | 请求体缺少 records 数组或 records 为空 |
+| `preview_not_found` | 404 | 预览不存在或已过期（30分钟TTL） |
+| `already_committed` | 409 | 该预览已提交，不可重复写入 |
+| `has_blocking_errors` | 422 | 存在阻断性错误（缺字段/环号重复），需修正后重新预览 |
+
 ### 野外作业场次
 - `POST /field-sessions` - 创建作业场次
 - `GET /field-sessions` - 查询作业场次列表（支持 `?season=&capturePlace=&dateFrom=&dateTo=` 筛选）

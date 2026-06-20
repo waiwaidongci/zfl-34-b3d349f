@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
 import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
+import { createPreview, getPreview, commitImport } from "./importPreview.js";
 import {
   createSession,
   listSessions,
@@ -71,6 +72,59 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/ring-inventory/")) {
       const handled = await handleRingInventoryRoutes(req, res, url, body);
       if (handled !== false) return;
+    }
+
+    if (url.pathname.startsWith("/import")) {
+      if (req.method === "POST" && url.pathname === "/import/preview") {
+        const input = await body(req);
+        if (!input.records || !Array.isArray(input.records)) {
+          return send(res, 400, { error: "invalid_input", message: "请求体需包含 records 数组" });
+        }
+        try {
+          const preview = createPreview(input.records, db.birds);
+          return send(res, 200, {
+            previewId: preview.previewId,
+            status: preview.status,
+            validation: preview.validation,
+            createdAt: new Date(preview.createdAt).toISOString()
+          });
+        } catch (e) {
+          if (e.message === "invalid_input") {
+            return send(res, 400, { error: "invalid_input", message: "records 不能为空" });
+          }
+          throw e;
+        }
+      }
+
+      const previewMatch = url.pathname.match(/^\/import\/preview\/([^/]+)$/);
+      if (previewMatch && req.method === "GET") {
+        const previewId = decodeURIComponent(previewMatch[1]);
+        const preview = getPreview(previewId);
+        if (!preview) return send(res, 404, { error: "preview_not_found", message: "预览不存在或已过期" });
+        return send(res, 200, {
+          previewId: preview.previewId,
+          status: preview.status,
+          validation: preview.validation,
+          createdAt: new Date(preview.createdAt).toISOString(),
+          committedAt: preview.committedAt || null
+        });
+      }
+
+      const commitMatch = url.pathname.match(/^\/import\/commit\/([^/]+)$/);
+      if (commitMatch && req.method === "POST") {
+        const previewId = decodeURIComponent(commitMatch[1]);
+        try {
+          const result = await commitImport(previewId);
+          return send(res, 200, result);
+        } catch (e) {
+          switch (e.message) {
+            case "preview_not_found": return send(res, 404, { error: "preview_not_found", message: "预览不存在或已过期" });
+            case "already_committed": return send(res, 409, { error: "already_committed", message: "该预览已提交，不可重复写入" });
+            case "has_blocking_errors": return send(res, 422, { error: "has_blocking_errors", message: "存在阻断性错误，请修正后重新提交预览" });
+            default: throw e;
+          }
+        }
+      }
     }
 
     if (url.pathname.startsWith("/field-sessions")) {
@@ -155,7 +209,8 @@ const server = http.createServer(async (req, res) => {
         "POST /ring-inventory/rings/release",
         "POST /field-sessions", "GET /field-sessions",
         "GET /field-sessions/:id", "PUT /field-sessions/:id", "DELETE /field-sessions/:id",
-        "GET /field-sessions/summary", "GET /field-sessions/:id/detail"
+        "GET /field-sessions/summary", "GET /field-sessions/:id/detail",
+        "POST /import/preview", "GET /import/preview/:previewId", "POST /import/commit/:previewId"
       ]
     });
 

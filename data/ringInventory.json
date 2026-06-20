@@ -1,0 +1,29 @@
+{
+  "batches": [
+    {
+      "id": "BATCH-2026-SPRING-001",
+      "prefix": "SB",
+      "startNo": 26000,
+      "endNo": 26999,
+      "season": "2026春",
+      "description": "2026年春季黑尾鸥环志批次",
+      "createdAt": "2026-01-15T00:00:00.000Z"
+    }
+  ],
+  "rings": [
+    {
+      "ringNo": "SB-26001",
+      "batchId": "BATCH-2026-SPRING-001",
+      "status": "allocated",
+      "allocatedTo": "SB-26001",
+      "allocatedAt": "2026-05-03T00:00:00.000Z"
+    },
+    {
+      "ringNo": "SB-26002",
+      "batchId": "BATCH-2026-SPRING-001",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null
+    }
+  ]
+}
