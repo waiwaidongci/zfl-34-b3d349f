@@ -604,7 +604,7 @@ curl -s -X POST http://localhost:3034/import/preview \
   -d '{
     "records": [
       {
-        "ringNo": "SB-26005",
+        "ringNo": "SB-26009",
         "species": "黑尾鸥",
         "sex": "male",
         "age": "adult",
@@ -613,7 +613,7 @@ curl -s -X POST http://localhost:3034/import/preview \
         "measurements": [{ "wing": 325, "weight": 505, "bill": 44 }]
       },
       {
-        "ringNo": "SB-26006",
+        "ringNo": "SB-26010",
         "species": "红嘴鸥",
         "sex": "female",
         "age": "subadult",
@@ -692,7 +692,7 @@ curl -s -X POST http://localhost:3034/import/commit/<PREVIEW_ID> | python3 -m js
 curl -s -X POST http://localhost:3034/birds \
   -H 'Content-Type: application/json' \
   -d '{
-    "ringNo": "SB-26008",
+    "ringNo": "SB-26011",
     "species": "黑尾鸥",
     "sex": "unknown",
     "age": "juvenile",
