@@ -3,8 +3,6 @@ import {
   loadLegacyCompatibleDb,
   readBirdsStore,
   readEventsStore,
-  writeBirdsStore,
-  writeEventsStore,
   writeBirdsAndEventsStore,
   reassembleBirdFromEvents
 } from "./dataStore.js";

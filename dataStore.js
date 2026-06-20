@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename, unlink, glob } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, unlink, glob, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -201,18 +201,58 @@ async function atomicWriteFile(filePath, data) {
 
 async function atomicWriteMulti(fileMap) {
   const entries = Array.isArray(fileMap)
-    ? fileMap.map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath) }))
-    : Object.entries(fileMap).map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath) }));
+    ? fileMap.map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath), backupPath: `${filePath}.bak.${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+    : Object.entries(fileMap).map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath), backupPath: `${filePath}.bak.${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }));
 
   await ensureDataDir();
 
+  const changed = [];
   for (const { tempPath, data } of entries) {
     const jsonStr = JSON.stringify(data, null, 2);
     await writeFile(tempPath, jsonStr, "utf8");
   }
 
-  for (const { tempPath, filePath } of entries) {
-    await rename(tempPath, filePath);
+  try {
+    for (const entry of entries) {
+      if (existsSync(entry.filePath)) {
+        const fileStat = await stat(entry.filePath);
+        if (!fileStat.isFile()) {
+          throw new Error(`target_not_file: ${entry.filePath}`);
+        }
+      }
+    }
+
+    for (const entry of entries) {
+      if (existsSync(entry.filePath)) {
+        await rename(entry.filePath, entry.backupPath);
+        entry.backedUp = true;
+      }
+    }
+
+    for (const entry of entries) {
+      await rename(entry.tempPath, entry.filePath);
+      entry.committed = true;
+      changed.push(entry);
+    }
+
+    for (const entry of entries) {
+      if (entry.backedUp) await unlink(entry.backupPath);
+    }
+  } catch (e) {
+    for (const entry of changed.reverse()) {
+      try {
+        if (entry.committed && existsSync(entry.filePath)) await unlink(entry.filePath);
+      } catch (_) {}
+    }
+    for (const entry of entries.reverse()) {
+      try {
+        if (entry.backedUp && existsSync(entry.backupPath)) await rename(entry.backupPath, entry.filePath);
+      } catch (_) {}
+      try {
+        if (existsSync(entry.tempPath)) await unlink(entry.tempPath);
+      } catch (_) {}
+    }
+    throw e;
   }
 }
 
@@ -316,48 +356,6 @@ async function verifyAndRepairConsistency() {
       }
     }
 
-    const eventRingNos = new Set(events.map(e => e.ringNo));
-    const birdsWithoutEvents = birds.filter(b =>
-      !eventRingNos.has(b.ringNo) && b.healthRisk && typeof b.healthRisk === "object" && b.healthRisk.score > 50
-    );
-    if (birdsWithoutEvents.length > 0) {
-      result.issues.push(`high_risk_birds_no_events: ${birdsWithoutEvents.map(b => b.ringNo).join(",")}`);
-    }
-
-    if (result.issues.length > 0 && existsSync(STORE_FILES.legacySeabirds)) {
-      console.log(`[dataStore] 检测到 ${result.issues.length} 个一致性问题，尝试从旧文件自动修复`);
-      const legacy = await readJsonSafely(STORE_FILES.legacySeabirds, null);
-      if (legacy && legacy.birds && legacy.birds.length > 0) {
-        const legacyBirds = legacy.birds;
-        const newBirds = [];
-        const newEvents = [];
-        for (const lb of legacyBirds) {
-          const { bird, events } = splitLegacyBirdToEvents(lb);
-          newBirds.push(bird);
-          newEvents.push(...events);
-        }
-
-        await atomicWriteMulti([
-          [STORE_FILES.birds, { birds: newBirds }],
-          [STORE_FILES.events, { events: newEvents }]
-        ]);
-
-        result.repaired = true;
-        result.issues.push("auto_repaired_from_legacy");
-        console.log(`[dataStore] 自动修复完成，重建 ${newBirds.length} birds, ${newEvents.length} events`);
-
-        birdsStore.birds = newBirds;
-        eventsStore.events = newEvents;
-        birds.length = 0;
-        birds.push(...newBirds);
-        events.length = 0;
-        events.push(...newEvents);
-        birdRingNos.clear();
-        newBirds.forEach(b => birdRingNos.add(b.ringNo));
-        orphanEvents.length = 0;
-      }
-    }
-
     result.summary = {
       totalBirds: birds.length,
       totalEvents: events.length,
@@ -421,6 +419,11 @@ async function performMigration() {
     }
     if (missingStores.includes("reports")) {
       writeBatch.push([STORE_FILES.reports, JSON.parse(JSON.stringify(SEED_DATA.reports))]);
+    }
+    for (const storeName of missingStores) {
+      if (storeName !== "birds" && storeName !== "events" && storeName !== "reports") {
+        writeBatch.push([STORE_FILES[storeName], JSON.parse(JSON.stringify(SEED_DATA[storeName]))]);
+      }
     }
 
     migrationState.hasMigrated = true;

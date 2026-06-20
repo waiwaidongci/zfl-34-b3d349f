@@ -5,7 +5,7 @@ import {
   readBirdsStore,
   readEventsStore,
   writeBirdsStore,
-  writeEventsStore,
+  writeBirdsAndEventsStore,
   reassembleBirdFromEvents,
   EVENT_TYPES
 } from "./dataStore.js";
@@ -111,8 +111,7 @@ export async function createBird(input) {
   birdsStore.birds.push(bird);
   eventsStore.events.push(...events);
 
-  await writeBirdsStore(birdsStore);
-  await writeEventsStore(eventsStore);
+  await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
   try { await syncAllocateRing(input.ringNo, input.ringNo); } catch (_) {}
 
@@ -217,8 +216,7 @@ export async function appendBirdEvent(ringNo, action, input) {
     healthRisk: reassembled.healthRisk
   };
 
-  await writeBirdsStore(birdsStore);
-  await writeEventsStore(eventsStore);
+  await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
   const opTypeMap = {
     measurements: OPERATION_TYPES.BIRD_MEASUREMENT_APPEND,
