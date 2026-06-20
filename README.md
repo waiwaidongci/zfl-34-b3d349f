@@ -863,6 +863,124 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
 
 ---
 
+## 离线采集包同步 API
+
+野外端可通过 `POST /offline-sync` 提交离线采集包。服务端会按事件时间写入数据，返回成功数量、冲突、失败和跳过明细；同一 `packetId` 重复提交会返回已处理结果并标记 `idempotent: true`。现有 `POST /birds`、`POST /birds/:ringNo/measurements` 等单条写入接口保持原有行为。
+
+### 请求示例
+
+```bash
+curl -s -X POST http://localhost:3034/offline-sync \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "packetId": "SYNC-FIELD-20260620-001",
+    "fieldSessions": [
+      {
+        "tempId": "session-temp-1",
+        "date": "2026-06-20",
+        "season": "2026春",
+        "capturePlace": "东礁A区",
+        "team": ["张三", "李四"],
+        "capturedCount": 1,
+        "releasedCount": 1
+      }
+    ],
+    "birds": [
+      {
+        "tempId": "bird-temp-1",
+        "ringNo": "SB-26030",
+        "species": "黑尾鸥",
+        "sex": "female",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "fieldSessionId": "session-temp-1",
+        "measurements": [
+          { "at": "2026-06-20T08:10:00.000Z", "wing": 322, "weight": 506, "bill": 43 }
+        ],
+        "releases": [
+          { "at": "2026-06-20T09:30:00.000Z", "place": "东礁A区" }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "tempId": "obs-temp-1",
+        "birdTempId": "bird-temp-1",
+        "eventType": "observations",
+        "data": {
+          "at": "2026-06-20T11:00:00.000Z",
+          "point": "N30.1,E122.3",
+          "note": "近岸盘旋"
+        }
+      }
+    ]
+  }' | python3 -m json.tool
+```
+
+### 响应示例
+
+成功写入返回 `200`：
+
+```json
+{
+  "packetId": "SYNC-FIELD-20260620-001",
+  "processedAt": "2026-06-20T11:05:00.000Z",
+  "success": {
+    "birds": 1,
+    "events": 3,
+    "sessions": 1
+  },
+  "conflicts": [],
+  "failures": [],
+  "skipped": [],
+  "ringNoConflicts": [],
+  "status": "success",
+  "idempotent": false
+}
+```
+
+部分失败返回 `207`，例如包内包含已存在环号和非法事件类型：
+
+```json
+{
+  "packetId": "SYNC-FIELD-20260620-002",
+  "success": {
+    "birds": 0,
+    "events": 0,
+    "sessions": 0
+  },
+  "conflicts": [
+    {
+      "type": "bird",
+      "tempId": "bird-conflict-1",
+      "ringNo": "SB-26001",
+      "reason": "ring_already_exists_in_db"
+    }
+  ],
+  "failures": [
+    {
+      "type": "event",
+      "tempId": "event-invalid-1",
+      "eventType": "invalid_type",
+      "reason": "missing_ring_no_or_temp_id_mapping"
+    }
+  ],
+  "skipped": [],
+  "ringNoConflicts": [
+    {
+      "tempId": "bird-conflict-1",
+      "ringNo": "SB-26001",
+      "reason": "ring_already_exists_in_db"
+    }
+  ],
+  "status": "partial_success",
+  "idempotent": false
+}
+```
+
+---
+
 ## 导入预览 API
 
 批量导入海鸟环志记录的**两步式**流程：先提交校验 → 确认后写入。现有 `POST /birds` 手工录入流程不受影响。

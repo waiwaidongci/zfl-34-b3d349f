@@ -73,68 +73,6 @@
         ],
         "status": "partial_success"
       }
-    },
-    {
-      "packetId": "SYNC-TEST-FIX-001",
-      "processedAt": "2026-06-20T15:19:34.030Z",
-      "result": {
-        "packetId": "SYNC-TEST-FIX-001",
-        "processedAt": "2026-06-20T15:19:34.030Z",
-        "success": {
-          "birds": 0,
-          "events": 3,
-          "sessions": 0
-        },
-        "conflicts": [
-          {
-            "type": "bird",
-            "tempId": "bird-conflict-sb26001",
-            "ringNo": "SB-26001",
-            "reason": "ring_already_exists_in_db"
-          }
-        ],
-        "failures": [],
-        "skipped": [],
-        "ringNoConflicts": [
-          {
-            "tempId": "bird-conflict-sb26001",
-            "ringNo": "SB-26001",
-            "reason": "ring_already_exists_in_db"
-          }
-        ],
-        "status": "partial_success"
-      }
-    },
-    {
-      "packetId": "SYNC-TEST-FIX-002",
-      "processedAt": "2026-06-20T15:20:22.861Z",
-      "result": {
-        "packetId": "SYNC-TEST-FIX-002",
-        "processedAt": "2026-06-20T15:20:22.861Z",
-        "success": {
-          "birds": 0,
-          "events": 1,
-          "sessions": 0
-        },
-        "conflicts": [
-          {
-            "type": "bird",
-            "tempId": "bird-sb26001-again",
-            "ringNo": "SB-26001",
-            "reason": "ring_already_exists_in_db"
-          }
-        ],
-        "failures": [],
-        "skipped": [],
-        "ringNoConflicts": [
-          {
-            "tempId": "bird-sb26001-again",
-            "ringNo": "SB-26001",
-            "reason": "ring_already_exists_in_db"
-          }
-        ],
-        "status": "partial_success"
-      }
     }
   ]
 }

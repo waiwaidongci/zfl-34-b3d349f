@@ -125,7 +125,7 @@
     {
       "ringNo": "SB-26001",
       "eventType": "observations",
-      "eventIndex": 0,
+      "eventIndex": 1,
       "data": {
         "at": "2026-06-19T14:00:00.000Z",
         "point": "N30.2,E122.4",
@@ -141,47 +141,6 @@
         "wing": 325,
         "weight": 500,
         "bill": 43
-      }
-    },
-    {
-      "ringNo": "SB-26001",
-      "eventType": "measurements",
-      "eventIndex": 1,
-      "data": {
-        "at": "2026-06-20",
-        "wing": 330,
-        "weight": 525,
-        "bill": 45
-      }
-    },
-    {
-      "ringNo": "SB-26001",
-      "eventType": "observations",
-      "eventIndex": 1,
-      "data": {
-        "at": "2026-06-20T09:00:00.000Z",
-        "point": "N30.3,E122.5",
-        "note": "繁殖期觅食"
-      }
-    },
-    {
-      "ringNo": "SB-26001",
-      "eventType": "observations",
-      "eventIndex": 2,
-      "data": {
-        "at": "2026-06-20T15:00:00.000Z",
-        "point": "N30.0,E122.0",
-        "note": "归巢"
-      }
-    },
-    {
-      "ringNo": "SB-26001",
-      "eventType": "observations",
-      "eventIndex": 3,
-      "data": {
-        "at": "2026-06-21T08:00:00.000Z",
-        "point": "N30.5,E122.6",
-        "note": "北迁途中"
       }
     }
   ]

@@ -286,32 +286,6 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: "ring_already_exists_in_db"
       });
-      resolvedBirdTempIdMap.set(tempId, bird.ringNo);
-
-      const birdInlineEventTypes = ["measurements", "releases", "recaptures", "observations"];
-      for (const type of birdInlineEventTypes) {
-        const arr = bird[type] || [];
-        if (Array.isArray(arr)) {
-          for (let j = 0; j < arr.length; j++) {
-            const inlineEvent = {
-              ringNo: bird.ringNo,
-              eventType: type,
-              data: { ...arr[j] }
-            };
-            if (!inlineEvent.data.fieldSessionId && resolvedFieldSessionId) {
-              inlineEvent.data.fieldSessionId = resolvedFieldSessionId;
-            }
-            if (type === "measurements" && !inlineEvent.data.at) {
-              inlineEvent.data.at = new Date().toISOString().slice(0, 10);
-            }
-            if ((type === "releases" || type === "recaptures" || type === "observations") && !inlineEvent.data.at) {
-              inlineEvent.data.at = new Date().toISOString();
-            }
-            eventsInput.push(inlineEvent);
-          }
-        }
-      }
-
       continue;
     }
 
