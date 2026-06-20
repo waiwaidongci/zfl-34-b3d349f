@@ -57,7 +57,7 @@ async function validateBirds(records, existingBirds) {
   const duplicateInDb = [];
   const missingMeasurements = [];
   const unknownSpeciesMap = new Map();
-  const dictValidationErrors = [];
+  const dictValidationWarnings = [];
 
   for (let i = 0; i < records.length; i++) {
     const rec = records[i];
@@ -89,14 +89,14 @@ async function validateBirds(records, existingBirds) {
     if (rec.capturePlace) {
       const placeCheck = await validateDictionaryValue("capturePlace", rec.capturePlace, { allowEmpty: true });
       if (!placeCheck.valid) {
-        dictValidationErrors.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "capturePlace", value: rec.capturePlace });
+        dictValidationWarnings.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "capturePlace", value: rec.capturePlace });
       }
     }
 
     if (rec.season) {
       const seasonCheck = await validateDictionaryValue("season", rec.season, { allowEmpty: true });
       if (!seasonCheck.valid) {
-        dictValidationErrors.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "season", value: rec.season });
+        dictValidationWarnings.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "season", value: rec.season });
       }
     }
 
@@ -133,8 +133,8 @@ async function validateBirds(records, existingBirds) {
       count: records.length,
       records
     })),
-    dictValidationErrors,
-    hasBlockingErrors: fieldErrors.length > 0 || duplicateInDb.length > 0 || unknownSpeciesMap.size > 0 || dictValidationErrors.length > 0
+    dictValidationWarnings,
+    hasBlockingErrors: fieldErrors.length > 0 || duplicateInDb.length > 0 || unknownSpeciesMap.size > 0
   };
 }
 
@@ -199,14 +199,8 @@ async function commitImport(previewId) {
     }
 
     const speciesCheck = await validateDictionaryValue("species", rec.species, { allowEmpty: false });
-    const placeCheck = await validateDictionaryValue("capturePlace", rec.capturePlace, { allowEmpty: true });
-    const seasonCheck = await validateDictionaryValue("season", rec.season, { allowEmpty: true });
-    if (!speciesCheck.valid || !placeCheck.valid || !seasonCheck.valid) {
-      const invalidFields = [];
-      if (!speciesCheck.valid) invalidFields.push("species");
-      if (!placeCheck.valid) invalidFields.push("capturePlace");
-      if (!seasonCheck.valid) invalidFields.push("season");
-      skipped.push({ ringNo: rec.ringNo || "(missing)", reason: "dictionary_validation_failed", invalidFields });
+    if (!speciesCheck.valid) {
+      skipped.push({ ringNo: rec.ringNo, reason: "dictionary_validation_failed", invalidFields: ["species"] });
       continue;
     }
 

@@ -824,7 +824,7 @@ curl -s -X POST http://localhost:3034/import/commit/<PREVIEW_ID> | python3 -m js
 
 预期返回 409 `already_committed`。
 
-**6）现有 POST /birds 流程不受影响**
+**7）现有 POST /birds 流程不受影响**
 
 ```bash
 curl -s -X POST http://localhost:3034/birds \

@@ -397,7 +397,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "POST" && action !== "history" && action !== "health-risk") {
         const input = await body(req);
-        if ((action === "recaptures" || action === "releases") && input.place) {
+        if ((action === "recaptures" || action === "releases" || action === "observations") && input.place) {
           const placeValidation = await validateDictionaryValue("capturePlace", input.place, { allowEmpty: true });
           const placeDictError = buildDictValidationError([placeValidation]);
           if (placeDictError) return send(res, placeDictError.status, placeDictError);
