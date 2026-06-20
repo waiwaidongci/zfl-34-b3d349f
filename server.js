@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -47,7 +48,11 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const db = await loadDb();
-    if (req.method === "GET" && url.pathname === "/") return send(res, 200, { service: "海鸟环志站API", endpoints: ["GET /birds", "POST /birds", "GET /birds/:ringNo/history", "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures", "POST /birds/:ringNo/observations", "GET /reports/recapture-rate?season="] });
+    if (url.pathname.startsWith("/ring-inventory/")) {
+      const handled = await handleRingInventoryRoutes(req, res, url, body);
+      if (handled !== false) return;
+    }
+    if (req.method === "GET" && url.pathname === "/") return send(res, 200, { service: "海鸟环志站API", endpoints: ["GET /birds", "POST /birds", "GET /birds/:ringNo/history", "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures", "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases", "GET /reports/recapture-rate?season=", "POST /ring-inventory/batches", "GET /ring-inventory/batches", "GET /ring-inventory/rings", "GET /ring-inventory/rings/available", "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next", "POST /ring-inventory/rings/release"] });
     if (req.method === "GET" && url.pathname === "/birds") {
       const species = url.searchParams.get("species");
       return send(res, 200, species ? db.birds.filter(b => b.species === species) : db.birds);
