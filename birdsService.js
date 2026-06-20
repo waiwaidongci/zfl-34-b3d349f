@@ -28,10 +28,15 @@ async function ensureInitialized() {
   await initialize();
 }
 
-export async function listBirds({ species } = {}) {
+export async function listBirds({ species, season, capturePlace, fieldSessionId, healthRiskLevel } = {}) {
   await ensureInitialized();
   const db = await loadLegacyCompatibleDb();
-  const birds = species ? db.birds.filter(b => b.species === species) : db.birds;
+  let birds = db.birds;
+  if (species) birds = birds.filter(b => b.species === species);
+  if (season) birds = birds.filter(b => b.season === season);
+  if (capturePlace) birds = birds.filter(b => b.capturePlace === capturePlace);
+  if (fieldSessionId) birds = birds.filter(b => b.fieldSessionId === fieldSessionId);
+  if (healthRiskLevel) birds = birds.filter(b => b.healthRisk && b.healthRisk.level === healthRiskLevel);
   return birds;
 }
 

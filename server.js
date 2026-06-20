@@ -324,7 +324,7 @@ const server = http.createServer(async (req, res) => {
         structure: ["birds.json", "events.json", "reports.json", "dictionaries.json", "fieldSessions.json", "ringInventory.json", "auditLogs.json"]
       },
       endpoints: [
-        "GET /birds", "POST /birds",
+        "GET /birds?species=&season=&capturePlace=&fieldSessionId=&healthRiskLevel=", "POST /birds",
         "GET /birds/:ringNo/history",
         "GET /birds/:ringNo/tracks",
         "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures",
@@ -354,7 +354,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/birds") {
       const species = url.searchParams.get("species");
-      const birds = await listBirds({ species });
+      const season = url.searchParams.get("season");
+      const capturePlace = url.searchParams.get("capturePlace");
+      const fieldSessionId = url.searchParams.get("fieldSessionId");
+      const healthRiskLevel = url.searchParams.get("healthRiskLevel");
+      const birds = await listBirds({ species, season, capturePlace, fieldSessionId, healthRiskLevel });
       return send(res, 200, birds);
     }
     if (req.method === "POST" && url.pathname === "/birds") {
