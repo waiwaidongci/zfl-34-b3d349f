@@ -2,7 +2,9 @@ import {
   initialize,
   loadLegacyCompatibleDb,
   readStore,
-  writeStore
+  writeStore,
+  readEventsStore,
+  EVENT_TYPES
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -24,6 +26,11 @@ async function saveSessions(sessions) {
 async function loadBirds() {
   await initialize();
   return await loadLegacyCompatibleDb();
+}
+
+async function loadEvents() {
+  await initialize();
+  return await readEventsStore();
 }
 
 function generateSessionId(date) {
@@ -140,26 +147,30 @@ export async function deleteSession(id) {
 export async function getSessionSummary({ season, capturePlace, dateFrom, dateTo } = {}) {
   const sessions = await listSessions({ season, capturePlace, dateFrom, dateTo });
   const birds = await loadBirds();
+  const eventsStore = await loadEvents();
 
   const birdRecords = birds.birds || [];
+  const eventRecords = eventsStore.events || [];
+  const birdsByRingNo = new Map(birdRecords.map(b => [b.ringNo, b]));
 
   return sessions.map(session => {
-    const sessionBirds = birdRecords.filter(b => b.fieldSessionId === session.id);
+    const sid = session.id;
+    const sessionBirds = birdRecords.filter(b => b.fieldSessionId === sid);
 
     const measurements = sessionBirds.reduce((sum, b) => {
-      return sum + (b.measurements || []).filter(m => m.fieldSessionId === session.id).length;
+      return sum + (b.measurements || []).filter(m => m.fieldSessionId === sid).length;
     }, 0);
 
     const recaptures = birdRecords.reduce((sum, b) => {
-      return sum + (b.recaptures || []).filter(r => r.fieldSessionId === session.id).length;
+      return sum + (b.recaptures || []).filter(r => r.fieldSessionId === sid).length;
     }, 0);
 
     const observations = birdRecords.reduce((sum, b) => {
-      return sum + (b.observations || []).filter(o => o.fieldSessionId === session.id).length;
+      return sum + (b.observations || []).filter(o => o.fieldSessionId === sid).length;
     }, 0);
 
     const releases = sessionBirds.reduce((sum, b) => {
-      return sum + (b.releases || []).filter(r => r.fieldSessionId === session.id).length;
+      return sum + (b.releases || []).filter(r => r.fieldSessionId === sid).length;
     }, 0);
 
     const speciesBreakdown = {};
@@ -167,18 +178,33 @@ export async function getSessionSummary({ season, capturePlace, dateFrom, dateTo
     for (const b of sessionBirds) {
       speciesBreakdown[b.species] ||= { species: b.species, banded: 0, recaptured: 0 };
       speciesBreakdown[b.species].banded += 1;
-      const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === session.id);
+      const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === sid);
       if (hasRecapture) speciesBreakdown[b.species].recaptured += 1;
     }
 
     for (const b of birdRecords) {
-      if (b.fieldSessionId === session.id) continue;
-      const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === session.id);
+      if (b.fieldSessionId === sid) continue;
+      const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === sid);
       if (hasRecapture) {
         speciesBreakdown[b.species] ||= { species: b.species, banded: 0, recaptured: 0 };
         speciesBreakdown[b.species].recaptured += 1;
       }
     }
+
+    const computedNewBirds = sessionBirds.length;
+    const computedRecapturesFromEvents = eventRecords.filter(e =>
+      e.eventType === "recaptures" && e.data && e.data.fieldSessionId === sid
+    ).length;
+    const computedCaptured = computedNewBirds + computedRecapturesFromEvents;
+    const computedReleasesFromEvents = eventRecords.filter(e =>
+      e.eventType === "releases" && e.data && e.data.fieldSessionId === sid
+    ).length;
+
+    const mismatchedCount = eventRecords.filter(e => {
+      if (!e.data || e.data.fieldSessionId !== sid) return false;
+      const bird = birdsByRingNo.get(e.ringNo);
+      return bird && bird.fieldSessionId !== sid;
+    }).length;
 
     return {
       id: session.id,
@@ -198,6 +224,23 @@ export async function getSessionSummary({ season, capturePlace, dateFrom, dateTo
         observations,
         releases,
         speciesBreakdown: Object.values(speciesBreakdown)
+      },
+      dataValidation: {
+        capturedCount: {
+          reported: session.capturedCount || 0,
+          computed: computedCaptured,
+          diff: computedCaptured - (session.capturedCount || 0),
+          breakdown: {
+            newBirds: computedNewBirds,
+            recaptures: computedRecapturesFromEvents
+          }
+        },
+        releasedCount: {
+          reported: session.releasedCount || 0,
+          computed: computedReleasesFromEvents,
+          diff: computedReleasesFromEvents - (session.releasedCount || 0)
+        },
+        mismatchedFieldSessionEventCount: mismatchedCount
       }
     };
   });
@@ -208,7 +251,9 @@ export async function getSessionDetail(id) {
   if (!session) return null;
 
   const birds = await loadBirds();
+  const eventsStore = await loadEvents();
   const birdRecords = birds.birds || [];
+  const eventRecords = eventsStore.events || [];
 
   const sessionBirds = birdRecords
     .filter(b => b.fieldSessionId === id)
@@ -238,9 +283,63 @@ export async function getSessionDetail(id) {
       recaptures: (b.recaptures || []).filter(r => r.fieldSessionId === id)
     }));
 
+  const birdsByRingNo = new Map(birdRecords.map(b => [b.ringNo, b]));
+
+  const computedNewBirds = birdRecords.filter(b => b.fieldSessionId === id).length;
+  const computedRecaptures = eventRecords.filter(e =>
+    e.eventType === "recaptures" && e.data && e.data.fieldSessionId === id
+  ).length;
+  const computedCaptured = computedNewBirds + computedRecaptures;
+
+  const computedReleases = eventRecords.filter(e =>
+    e.eventType === "releases" && e.data && e.data.fieldSessionId === id
+  ).length;
+
+  const mismatchedEvents = [];
+  for (const e of eventRecords) {
+    if (!e.data || e.data.fieldSessionId !== id) continue;
+    const bird = birdsByRingNo.get(e.ringNo);
+    if (!bird) continue;
+    if (bird.fieldSessionId !== id) {
+      mismatchedEvents.push({
+        ringNo: e.ringNo,
+        eventType: e.eventType,
+        eventIndex: e.eventIndex,
+        birdFieldSessionId: bird.fieldSessionId,
+        eventFieldSessionId: e.data.fieldSessionId,
+        birdSpecies: bird.species,
+        data: { ...e.data }
+      });
+    }
+  }
+  mismatchedEvents.sort((a, b) => {
+    if (a.ringNo !== b.ringNo) return a.ringNo.localeCompare(b.ringNo);
+    if (a.eventType !== b.eventType) return a.eventType.localeCompare(b.eventType);
+    return a.eventIndex - b.eventIndex;
+  });
+
+  const dataValidation = {
+    capturedCount: {
+      reported: session.capturedCount || 0,
+      computed: computedCaptured,
+      diff: computedCaptured - (session.capturedCount || 0),
+      breakdown: {
+        newBirds: computedNewBirds,
+        recaptures: computedRecaptures
+      }
+    },
+    releasedCount: {
+      reported: session.releasedCount || 0,
+      computed: computedReleases,
+      diff: computedReleases - (session.releasedCount || 0)
+    },
+    mismatchedFieldSessionEvents: mismatchedEvents
+  };
+
   return {
     ...session,
     relatedBirds: sessionBirds,
-    recapturedBirds: recaptureBirds
+    recapturedBirds: recaptureBirds,
+    dataValidation
   };
 }
