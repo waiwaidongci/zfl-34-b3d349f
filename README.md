@@ -162,16 +162,19 @@ curl -s http://localhost:3034/ | python3 -m json.tool
 # 2. GET /birds - 鸟类总数应与旧库一致
 curl -s http://localhost:3034/birds | python3 -c "import sys,json; d=json.load(sys.stdin); print('迁移后鸟数:', len(d), '鸟环号列表:', [b['ringNo'] for b in d])"
 
-# 3. GET /birds/SB-26001/history - 子记录完整（measurements/releases/recaptures/observations 都在）
+# 3. GET /birds - 支持 species、season、capturePlace、fieldSessionId、healthRiskLevel 组合筛选
+curl -s 'http://localhost:3034/birds?species=黑尾鸥&season=2026春&capturePlace=东礁A区&fieldSessionId=FS-2026-0503-001&healthRiskLevel=high' | python3 -c "import sys,json; d=json.load(sys.stdin); print('组合筛选鸟数:', len(d), '鸟环号列表:', [b['ringNo'] for b in d])"
+
+# 4. GET /birds/SB-26001/history - 子记录完整（measurements/releases/recaptures/observations 都在）
 curl -s http://localhost:3034/birds/SB-26001/history | python3 -m json.tool
 
-# 4. 统计 - 复捕率应与旧数据一致
+# 5. 统计 - 复捕率应与旧数据一致
 curl -s 'http://localhost:3034/reports/recapture-rate?season=2026春' | python3 -m json.tool
 
-# 5. 统计 - 健康风险报告
+# 6. 统计 - 健康风险报告
 curl -s http://localhost:3034/health-risk/report | python3 -c "import sys,json; d=json.load(sys.stdin); print('总数:', d['total'], '按等级:', d['byLevel'])"
 
-# 6. 比对物理文件
+# 7. 比对物理文件
 echo "=== 新结构文件 ==="
 ls -la data/birds.json data/events.json data/reports.json
 echo "=== birds.json 鸟数 ==="
@@ -850,7 +853,7 @@ curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态
 ## 原有接口
 
 ### 鸟类记录管理
-- `GET /birds` - 查询鸟类列表，支持 `?species=` 筛选
+- `GET /birds` - 查询鸟类列表，支持 `?species=&season=&capturePlace=&fieldSessionId=&healthRiskLevel=` 组合筛选
 - `POST /birds` - 创建鸟类记录（自动检查 ringNo 重复，支持 `fieldSessionId` 关联作业场次，子记录自动继承）
 - `GET /birds/:ringNo/history` - 查询单只鸟完整档案
 - `POST /birds/:ringNo/measurements` - 添加测量数据（请求体支持 `fieldSessionId` 关联作业场次）
