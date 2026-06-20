@@ -5,6 +5,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
 import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
+import {
+  createSession,
+  listSessions,
+  getSession,
+  updateSession,
+  deleteSession,
+  getSessionSummary,
+  getSessionDetail
+} from "./fieldSessions.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -19,9 +28,10 @@ const seed = {
       age: "adult",
       capturePlace: "东礁A区",
       season: "2026春",
-      measurements: [{ at: "2026-05-03", wing: 328, weight: 512, bill: 44 }],
-      releases: [{ at: "2026-05-03T09:40:00.000Z", place: "东礁A区" }],
-      recaptures: [{ at: "2026-06-11", place: "东礁B区", note: "换羽正常" }],
+      fieldSessionId: "FS-2026-0503-001",
+      measurements: [{ at: "2026-05-03", wing: 328, weight: 512, bill: 44, fieldSessionId: "FS-2026-0503-001" }],
+      releases: [{ at: "2026-05-03T09:40:00.000Z", place: "东礁A区", fieldSessionId: "FS-2026-0503-001" }],
+      recaptures: [{ at: "2026-06-11", place: "东礁B区", note: "换羽正常", fieldSessionId: "FS-2026-0611-001" }],
       observations: [{ at: "2026-06-15", point: "N30.1,E122.3", note: "近岸盘旋" }]
     }
   ]
@@ -45,15 +55,110 @@ function send(res, status, data) {
   res.end(JSON.stringify(data, null, 2));
 }
 
+function mapSessionError(e) {
+  switch (e.message) {
+    case "missing_required_fields": return { status: 400, error: "missing_required_fields", message: "缺少必填字段：date、season、capturePlace" };
+    case "session_not_found": return { status: 404, error: "session_not_found", message: "作业场次不存在" };
+    default: return { status: 500, error: e.message };
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const db = await loadDb();
+
     if (url.pathname.startsWith("/ring-inventory/")) {
       const handled = await handleRingInventoryRoutes(req, res, url, body);
       if (handled !== false) return;
     }
-    if (req.method === "GET" && url.pathname === "/") return send(res, 200, { service: "海鸟环志站API", endpoints: ["GET /birds", "POST /birds", "GET /birds/:ringNo/history", "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures", "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases", "GET /reports/recapture-rate?season=", "POST /ring-inventory/batches", "GET /ring-inventory/batches", "GET /ring-inventory/rings", "GET /ring-inventory/rings/available", "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next", "POST /ring-inventory/rings/release"] });
+
+    if (url.pathname.startsWith("/field-sessions")) {
+      if (req.method === "POST" && url.pathname === "/field-sessions") {
+        const input = await body(req);
+        try {
+          const session = await createSession(input);
+          return send(res, 201, session);
+        } catch (e) {
+          const mapped = mapSessionError(e);
+          return send(res, mapped.status, mapped);
+        }
+      }
+
+      if (req.method === "GET" && url.pathname === "/field-sessions") {
+        const season = url.searchParams.get("season");
+        const capturePlace = url.searchParams.get("capturePlace");
+        const dateFrom = url.searchParams.get("dateFrom");
+        const dateTo = url.searchParams.get("dateTo");
+        const sessions = await listSessions({ season, capturePlace, dateFrom, dateTo });
+        return send(res, 200, sessions);
+      }
+
+      if (req.method === "GET" && url.pathname === "/field-sessions/summary") {
+        const season = url.searchParams.get("season");
+        const capturePlace = url.searchParams.get("capturePlace");
+        const dateFrom = url.searchParams.get("dateFrom");
+        const dateTo = url.searchParams.get("dateTo");
+        const summary = await getSessionSummary({ season, capturePlace, dateFrom, dateTo });
+        return send(res, 200, summary);
+      }
+
+      const idMatch = url.pathname.match(/^\/field-sessions\/([^/]+)$/);
+      if (idMatch) {
+        const id = decodeURIComponent(idMatch[1]);
+        if (req.method === "GET") {
+          const detail = await getSessionDetail(id);
+          if (!detail) return send(res, 404, { error: "session_not_found" });
+          return send(res, 200, detail);
+        }
+        if (req.method === "PUT") {
+          const input = await body(req);
+          try {
+            const updated = await updateSession(id, input);
+            return send(res, 200, updated);
+          } catch (e) {
+            const mapped = mapSessionError(e);
+            return send(res, mapped.status, mapped);
+          }
+        }
+        if (req.method === "DELETE") {
+          try {
+            await deleteSession(id);
+            return send(res, 200, { deleted: true });
+          } catch (e) {
+            const mapped = mapSessionError(e);
+            return send(res, mapped.status, mapped);
+          }
+        }
+      }
+
+      const detailMatch = url.pathname.match(/^\/field-sessions\/([^/]+)\/(detail)$/);
+      if (detailMatch && req.method === "GET") {
+        const id = decodeURIComponent(detailMatch[1]);
+        const detail = await getSessionDetail(id);
+        if (!detail) return send(res, 404, { error: "session_not_found" });
+        return send(res, 200, detail);
+      }
+    }
+
+    if (req.method === "GET" && url.pathname === "/") return send(res, 200, {
+      service: "海鸟环志站API",
+      endpoints: [
+        "GET /birds", "POST /birds",
+        "GET /birds/:ringNo/history",
+        "POST /birds/:ringNo/measurements", "POST /birds/:ringNo/recaptures",
+        "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases",
+        "GET /reports/recapture-rate?season=",
+        "POST /ring-inventory/batches", "GET /ring-inventory/batches",
+        "GET /ring-inventory/rings", "GET /ring-inventory/rings/available",
+        "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next",
+        "POST /ring-inventory/rings/release",
+        "POST /field-sessions", "GET /field-sessions",
+        "GET /field-sessions/:id", "PUT /field-sessions/:id", "DELETE /field-sessions/:id",
+        "GET /field-sessions/summary", "GET /field-sessions/:id/detail"
+      ]
+    });
+
     if (req.method === "GET" && url.pathname === "/birds") {
       const species = url.searchParams.get("species");
       return send(res, 200, species ? db.birds.filter(b => b.species === species) : db.birds);
@@ -62,7 +167,27 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       if (db.birds.some(b => b.ringNo === input.ringNo)) return send(res, 409, { error: "ring_exists" });
       if (await isRingAllocated(input.ringNo)) return send(res, 409, { error: "ring_allocated_in_inventory", message: "该环号在库存中已被占用" });
-      const bird = { ringNo: input.ringNo, species: input.species, sex: input.sex || "unknown", age: input.age, capturePlace: input.capturePlace, season: input.season, measurements: input.measurements || [], releases: input.releases || [], recaptures: [], observations: [] };
+      const bird = {
+        ringNo: input.ringNo,
+        species: input.species,
+        sex: input.sex || "unknown",
+        age: input.age,
+        capturePlace: input.capturePlace,
+        season: input.season,
+        fieldSessionId: input.fieldSessionId || null,
+        measurements: (input.measurements || []).map(m => ({
+          ...m,
+          at: m.at || new Date().toISOString().slice(0, 10),
+          fieldSessionId: m.fieldSessionId || input.fieldSessionId || null
+        })),
+        releases: (input.releases || []).map(r => ({
+          ...r,
+          at: r.at || new Date().toISOString(),
+          fieldSessionId: r.fieldSessionId || input.fieldSessionId || null
+        })),
+        recaptures: [],
+        observations: []
+      };
       db.birds.push(bird);
       await saveDb(db);
       await syncAllocateRing(input.ringNo, input.ringNo);
@@ -76,7 +201,10 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET" && action === "history") return send(res, 200, bird);
       if (req.method === "POST" && action !== "history") {
         const input = await body(req);
-        bird[action].push({ at: input.at || new Date().toISOString(), ...input });
+        bird[action].push({
+          at: input.at || (action === "measurements" ? new Date().toISOString().slice(0, 10) : new Date().toISOString()),
+          ...input
+        });
         await saveDb(db);
         return send(res, 201, bird);
       }
