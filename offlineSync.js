@@ -165,6 +165,15 @@ async function processOfflinePacket(packet) {
   const existingEventSignatures = new Set(eventsStore.events.map(buildEventSignature));
   const existingSessionIds = new Set();
 
+  const existingEventIndexMap = new Map();
+  for (const e of eventsStore.events) {
+    const key = `${e.ringNo}|${e.eventType}`;
+    const current = existingEventIndexMap.get(key) || -1;
+    if (e.eventIndex > current) {
+      existingEventIndexMap.set(key, e.eventIndex);
+    }
+  }
+
   const sessionsInput = Array.isArray(packet.fieldSessions) ? packet.fieldSessions : [];
   const birdsInput = Array.isArray(packet.birds) ? packet.birds : [];
   const eventsInput = Array.isArray(packet.events) ? packet.events : [];
@@ -278,6 +287,31 @@ async function processOfflinePacket(packet) {
         reason: "ring_already_exists_in_db"
       });
       resolvedBirdTempIdMap.set(tempId, bird.ringNo);
+
+      const birdInlineEventTypes = ["measurements", "releases", "recaptures", "observations"];
+      for (const type of birdInlineEventTypes) {
+        const arr = bird[type] || [];
+        if (Array.isArray(arr)) {
+          for (let j = 0; j < arr.length; j++) {
+            const inlineEvent = {
+              ringNo: bird.ringNo,
+              eventType: type,
+              data: { ...arr[j] }
+            };
+            if (!inlineEvent.data.fieldSessionId && resolvedFieldSessionId) {
+              inlineEvent.data.fieldSessionId = resolvedFieldSessionId;
+            }
+            if (type === "measurements" && !inlineEvent.data.at) {
+              inlineEvent.data.at = new Date().toISOString().slice(0, 10);
+            }
+            if ((type === "releases" || type === "recaptures" || type === "observations") && !inlineEvent.data.at) {
+              inlineEvent.data.at = new Date().toISOString();
+            }
+            eventsInput.push(inlineEvent);
+          }
+        }
+      }
+
       continue;
     }
 
@@ -423,8 +457,10 @@ async function processOfflinePacket(packet) {
       : null;
 
     const counterKey = `${resolvedRingNo}|${event.eventType}`;
-    const currentIndex = typeCounterMap.get(counterKey) || 0;
-    typeCounterMap.set(counterKey, currentIndex + 1);
+    const existingMaxIndex = existingEventIndexMap.get(counterKey) ?? -1;
+    const packetCount = typeCounterMap.get(counterKey) || 0;
+    const currentIndex = existingMaxIndex + 1 + packetCount;
+    typeCounterMap.set(counterKey, packetCount + 1);
 
     try {
       const eventData = { ...(event.data || {}) };

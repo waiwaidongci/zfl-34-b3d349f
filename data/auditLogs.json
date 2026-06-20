@@ -260,6 +260,118 @@
           }
         ]
       }
+    },
+    {
+      "id": "LOG-MQMI75W7-88cb09dd",
+      "timestamp": "2026-06-20T15:19:34.041Z",
+      "operationType": "offline_sync_packet",
+      "targetType": "offline_sync",
+      "targetId": "SYNC-TEST-FIX-001",
+      "requestSummary": {
+        "packetId": "SYNC-TEST-FIX-001",
+        "inputCounts": {
+          "sessions": 0,
+          "birds": 1,
+          "events": 3
+        },
+        "success": {
+          "birds": 0,
+          "events": 3,
+          "sessions": 0
+        },
+        "conflictsCount": 1,
+        "failuresCount": 0,
+        "skippedCount": 0,
+        "ringNoConflictCount": 1,
+        "status": "partial_success"
+      },
+      "before": null,
+      "after": {
+        "createdSessions": [],
+        "createdBirds": [
+          {
+            "tempId": "bird-conflict-sb26001",
+            "ringNo": "SB-26001",
+            "bird": {
+              "ringNo": "SB-26001",
+              "species": "黑尾鸥",
+              "sex": "unknown",
+              "age": "adult",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": "FS-2026-0503-001",
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "low"
+            }
+          }
+        ],
+        "ringNoConflicts": [
+          {
+            "tempId": "bird-conflict-sb26001",
+            "ringNo": "SB-26001",
+            "reason": "ring_already_exists_in_db"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LOG-MQMI87KH-88f75fc3",
+      "timestamp": "2026-06-20T15:20:22.865Z",
+      "operationType": "offline_sync_packet",
+      "targetType": "offline_sync",
+      "targetId": "SYNC-TEST-FIX-002",
+      "requestSummary": {
+        "packetId": "SYNC-TEST-FIX-002",
+        "inputCounts": {
+          "sessions": 0,
+          "birds": 1,
+          "events": 1
+        },
+        "success": {
+          "birds": 0,
+          "events": 1,
+          "sessions": 0
+        },
+        "conflictsCount": 1,
+        "failuresCount": 0,
+        "skippedCount": 0,
+        "ringNoConflictCount": 1,
+        "status": "partial_success"
+      },
+      "before": null,
+      "after": {
+        "createdSessions": [],
+        "createdBirds": [
+          {
+            "tempId": "bird-sb26001-again",
+            "ringNo": "SB-26001",
+            "bird": {
+              "ringNo": "SB-26001",
+              "species": "黑尾鸥",
+              "sex": "unknown",
+              "age": "adult",
+              "capturePlace": "东礁A区",
+              "season": "2026春",
+              "fieldSessionId": "FS-2026-0503-001",
+              "measurementsCount": 0,
+              "recapturesCount": 0,
+              "observationsCount": 0,
+              "releasesCount": 0,
+              "healthRiskLevel": "low"
+            }
+          }
+        ],
+        "ringNoConflicts": [
+          {
+            "tempId": "bird-sb26001-again",
+            "ringNo": "SB-26001",
+            "reason": "ring_already_exists_in_db"
+          }
+        ]
+      }
     }
   ]
 }
