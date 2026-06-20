@@ -3,6 +3,7 @@ import {
   loadLegacyCompatibleDb,
   readBirdsStore,
   readEventsStore,
+  readStore,
   writeBirdsAndEventsStore,
   reassembleBirdFromEvents
 } from "./dataStore.js";
@@ -51,9 +52,10 @@ function buildKnownSpeciesSet(existingBirds) {
   return species;
 }
 
-async function validateBirds(records, existingBirds) {
+async function validateBirds(records, existingBirds, fieldSessions) {
   const existingRingNos = new Set(existingBirds.map(b => b.ringNo));
   const batchRingCounts = new Map();
+  const sessionMap = new Map((fieldSessions || []).map(s => [s.id, s]));
 
   const fieldErrors = [];
   const duplicateInBatch = [];
@@ -61,6 +63,7 @@ async function validateBirds(records, existingBirds) {
   const missingMeasurements = [];
   const unknownSpeciesMap = new Map();
   const dictValidationWarnings = [];
+  const fieldSessionWarnings = [];
 
   for (let i = 0; i < records.length; i++) {
     const rec = records[i];
@@ -103,6 +106,37 @@ async function validateBirds(records, existingBirds) {
       }
     }
 
+    if (rec.fieldSessionId) {
+      const session = sessionMap.get(rec.fieldSessionId);
+      if (!session) {
+        fieldSessionWarnings.push({
+          index: i,
+          ringNo: rec.ringNo || "(missing)",
+          fieldSessionId: rec.fieldSessionId,
+          warningType: "session_not_found",
+          message: `引用的作业场次 ${rec.fieldSessionId} 不存在`
+        });
+      } else {
+        const mismatches = [];
+        if (rec.season && rec.season !== session.season) {
+          mismatches.push({ field: "season", recordValue: rec.season, sessionValue: session.season });
+        }
+        if (rec.capturePlace && rec.capturePlace !== session.capturePlace) {
+          mismatches.push({ field: "capturePlace", recordValue: rec.capturePlace, sessionValue: session.capturePlace });
+        }
+        if (mismatches.length > 0) {
+          fieldSessionWarnings.push({
+            index: i,
+            ringNo: rec.ringNo || "(missing)",
+            fieldSessionId: rec.fieldSessionId,
+            warningType: "session_mismatch",
+            message: `记录与场次不一致: ${mismatches.map(m => `${m.field}(记录:${m.recordValue}, 场次:${m.sessionValue})`).join(", ")}`,
+            mismatches
+          });
+        }
+      }
+    }
+
     if (errors.length > 0) {
       fieldErrors.push({ index: i, ringNo: rec.ringNo || "(missing)", errors });
     }
@@ -124,6 +158,9 @@ async function validateBirds(records, existingBirds) {
     }
   }
 
+  const recordsWithFieldSession = records.filter(r => !!r.fieldSessionId).length;
+  const recordsWithoutFieldSession = records.length - recordsWithFieldSession;
+
   return {
     totalRecords: records.length,
     validRecords: records.length - fieldErrors.length - duplicateInDb.length,
@@ -137,8 +174,22 @@ async function validateBirds(records, existingBirds) {
       records
     })),
     dictValidationWarnings,
+    fieldSessionWarnings,
+    fieldSessionValidationSummary: {
+      totalRecords: records.length,
+      recordsWithFieldSession,
+      recordsWithoutFieldSession,
+      sessionNotFoundCount: fieldSessionWarnings.filter(w => w.warningType === "session_not_found").length,
+      sessionMismatchCount: fieldSessionWarnings.filter(w => w.warningType === "session_mismatch").length
+    },
     hasBlockingErrors: fieldErrors.length > 0 || duplicateInDb.length > 0 || unknownSpeciesMap.size > 0
   };
+}
+
+async function loadFieldSessions() {
+  await initialize();
+  const store = await readStore("fieldSessions");
+  return store.fieldSessions || [];
 }
 
 async function createPreview(records, existingBirds) {
@@ -148,7 +199,8 @@ async function createPreview(records, existingBirds) {
     throw new Error("invalid_input");
   }
 
-  const validation = await validateBirds(records, existingBirds);
+  const fieldSessions = await loadFieldSessions();
+  const validation = await validateBirds(records, existingBirds, fieldSessions);
   const previewId = `IMP-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`;
 
   const preview = {
@@ -261,11 +313,22 @@ async function commitImport(previewId) {
   preview.committedAt = new Date().toISOString();
 
   const importedRingNos = imported.map(b => b.ringNo);
+  const fieldSessionValidationSummary = preview.validation.fieldSessionValidationSummary || null;
+  const fieldSessionWarnings = preview.validation.fieldSessionWarnings || [];
   recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_BATCH_IMPORT,
     targetType: TARGET_TYPES.BIRD,
     targetId: previewId,
-    requestSummary: { previewId, importedCount: imported.length, skippedCount: skipped.length, importedRingNos, skippedDetails: skipped },
+    requestSummary: {
+      previewId,
+      importedCount: imported.length,
+      skippedCount: skipped.length,
+      importedRingNos,
+      skippedDetails: skipped,
+      fieldSessionValidation: fieldSessionValidationSummary
+        ? { ...fieldSessionValidationSummary, warnings: fieldSessionWarnings }
+        : null
+    },
     before: null,
     after: imported.map(b => pickBirdKeyFields(b))
   });
