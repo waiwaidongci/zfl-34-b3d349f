@@ -148,25 +148,39 @@ async function getSessionSummary({ season, capturePlace, dateFrom, dateTo } = {}
 
   return sessions.map(session => {
     const sessionBirds = birdRecords.filter(b => b.fieldSessionId === session.id);
+
     const measurements = sessionBirds.reduce((sum, b) => {
       return sum + (b.measurements || []).filter(m => m.fieldSessionId === session.id).length;
     }, 0);
-    const recaptures = sessionBirds.reduce((sum, b) => {
+
+    const recaptures = birdRecords.reduce((sum, b) => {
       return sum + (b.recaptures || []).filter(r => r.fieldSessionId === session.id).length;
     }, 0);
-    const observations = sessionBirds.reduce((sum, b) => {
+
+    const observations = birdRecords.reduce((sum, b) => {
       return sum + (b.observations || []).filter(o => o.fieldSessionId === session.id).length;
     }, 0);
+
     const releases = sessionBirds.reduce((sum, b) => {
       return sum + (b.releases || []).filter(r => r.fieldSessionId === session.id).length;
     }, 0);
 
     const speciesBreakdown = {};
+
     for (const b of sessionBirds) {
       speciesBreakdown[b.species] ||= { species: b.species, banded: 0, recaptured: 0 };
       speciesBreakdown[b.species].banded += 1;
       const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === session.id);
       if (hasRecapture) speciesBreakdown[b.species].recaptured += 1;
+    }
+
+    for (const b of birdRecords) {
+      if (b.fieldSessionId === session.id) continue;
+      const hasRecapture = (b.recaptures || []).some(r => r.fieldSessionId === session.id);
+      if (hasRecapture) {
+        speciesBreakdown[b.species] ||= { species: b.species, banded: 0, recaptured: 0 };
+        speciesBreakdown[b.species].recaptured += 1;
+      }
     }
 
     return {
