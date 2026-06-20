@@ -1,0 +1,84 @@
+{
+  "events": [
+    {
+      "ringNo": "SB-26001",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-05-03",
+        "wing": 328,
+        "weight": 512,
+        "bill": 44,
+        "fieldSessionId": "FS-2026-0503-001"
+      }
+    },
+    {
+      "ringNo": "SB-26001",
+      "eventType": "releases",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-05-03T09:40:00.000Z",
+        "place": "东礁A区",
+        "fieldSessionId": "FS-2026-0503-001"
+      }
+    },
+    {
+      "ringNo": "SB-26001",
+      "eventType": "recaptures",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-11",
+        "place": "东礁B区",
+        "note": "换羽正常",
+        "fieldSessionId": "FS-2026-0611-001"
+      }
+    },
+    {
+      "ringNo": "SB-26001",
+      "eventType": "observations",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-15",
+        "point": "N30.1,E122.3",
+        "note": "近岸盘旋"
+      }
+    },
+    {
+      "ringNo": "SB-26005",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "wing": 325,
+        "weight": 505,
+        "bill": 44,
+        "at": "2026-06-20",
+        "fieldSessionId": null
+      }
+    },
+    {
+      "ringNo": "SB-26005",
+      "eventType": "recaptures",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-20",
+        "place": "东礁B区",
+        "status": "healthy",
+        "weight": 498,
+        "fieldSessionId": "FS-2026-0503-001",
+        "notes": "新增回捕测试验证"
+      }
+    },
+    {
+      "ringNo": "SB-26006",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "wing": 280,
+        "weight": 320,
+        "bill": 35,
+        "at": "2026-06-20",
+        "fieldSessionId": null
+      }
+    }
+  ]
+}

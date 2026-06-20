@@ -1,0 +1,100 @@
+{
+  "birds": [
+    {
+      "ringNo": "SB-26001",
+      "species": "黑尾鸥",
+      "sex": "unknown",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": {
+        "ringNo": "SB-26001",
+        "species": "黑尾鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T12:03:05.089Z",
+        "latestMeasurement": {
+          "at": "2026-05-03",
+          "wing": 328,
+          "weight": 512,
+          "bill": 44,
+          "fieldSessionId": "FS-2026-0503-001"
+        }
+      }
+    },
+    {
+      "ringNo": "SB-26005",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": null,
+      "healthRisk": {
+        "ringNo": "SB-26005",
+        "species": "黑尾鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T14:08:17.557Z",
+        "latestMeasurement": {
+          "wing": 325,
+          "weight": 505,
+          "bill": 44,
+          "at": "2026-06-20",
+          "fieldSessionId": null
+        }
+      }
+    },
+    {
+      "ringNo": "SB-26006",
+      "species": "红嘴鸥",
+      "sex": "female",
+      "age": "subadult",
+      "capturePlace": "东礁B区",
+      "season": "2026春",
+      "fieldSessionId": null,
+      "healthRisk": {
+        "ringNo": "SB-26006",
+        "species": "红嘴鸥",
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "latestMeasurement": {
+          "wing": 280,
+          "weight": 320,
+          "bill": 35,
+          "at": "2026-06-20",
+          "fieldSessionId": null
+        }
+      }
+    },
+    {
+      "ringNo": "SB-26008",
+      "species": "黑尾鸥",
+      "sex": "unknown",
+      "age": "juvenile",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": null,
+      "healthRisk": {
+        "ringNo": "SB-26008",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "latestMeasurement": null
+      }
+    }
+  ]
+}

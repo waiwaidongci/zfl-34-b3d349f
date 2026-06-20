@@ -1,12 +1,19 @@
-import { mkdir, readFile, writeFile, readdir, copyFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { validateSnapshotStructure } from "./backupValidator.js";
+import {
+  initialize,
+  loadLegacyCompatibleDb,
+  saveLegacyCompatibleDb,
+  STORE_FILES,
+  atomicWriteFile
+} from "./dataStore.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, "data", "seabirds.json");
+const dbPath = STORE_FILES.legacySeabirds;
 const snapshotsDir = join(__dirname, "data", "snapshots");
 const indexPath = join(snapshotsDir, "index.json");
 
@@ -19,7 +26,7 @@ async function ensureSnapshotsDir() {
 async function loadIndex() {
   await ensureSnapshotsDir();
   if (!existsSync(indexPath)) {
-    await writeFile(indexPath, JSON.stringify({ snapshots: [] }, null, 2));
+    await atomicWriteFile(indexPath, { snapshots: [] });
     return { snapshots: [] };
   }
   try {
@@ -31,7 +38,7 @@ async function loadIndex() {
 
 async function saveIndex(data) {
   await ensureSnapshotsDir();
-  await writeFile(indexPath, JSON.stringify(data, null, 2));
+  await atomicWriteFile(indexPath, data);
 }
 
 function generateSnapshotId() {
@@ -56,16 +63,13 @@ function computeSummary(db) {
 }
 
 export async function createSnapshot() {
-  if (!existsSync(dbPath)) {
-    throw new Error("db_not_found");
-  }
+  await initialize();
+  const db = await loadLegacyCompatibleDb();
 
-  const raw = await readFile(dbPath, "utf8");
-  let db;
-  try {
-    db = JSON.parse(raw);
-  } catch {
-    throw new Error("db_parse_error");
+  if (!db.birds || db.birds.length === 0) {
+    if (!existsSync(dbPath)) {
+      throw new Error("db_not_found");
+    }
   }
 
   const validation = validateSnapshotStructure(db);
@@ -81,14 +85,14 @@ export async function createSnapshot() {
     _meta: {
       snapshotId,
       createdAt: new Date().toISOString(),
-      sourceFile: "data/seabirds.json",
+      sourceFile: "data/seabirds.json (compatible view of birds.json + events.json)",
       summary: computeSummary(db)
     },
     data: db
   };
 
   await ensureSnapshotsDir();
-  await writeFile(snapshotFilePath, JSON.stringify(snapshotData, null, 2));
+  await atomicWriteFile(snapshotFilePath, snapshotData);
 
   const index = await loadIndex();
   index.snapshots.push({
@@ -165,7 +169,7 @@ export async function restoreFromSnapshot(snapshotId) {
     throw err;
   }
 
-  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await saveLegacyCompatibleDb(db);
 
   return {
     snapshotId,

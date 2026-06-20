@@ -1,17 +1,22 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  initialize,
+  loadLegacyCompatibleDb,
+  readStore,
+  writeStore,
+  atomicWriteFile,
+  readJsonSafely
+} from "./dataStore.js";
 import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
   pickRingKeyFields
 } from "./auditLog.js";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const inventoryPath = join(__dirname, "data", "ringInventory.json");
-const birdsPath = join(__dirname, "data", "seabirds.json");
 
 const seed = {
   batches: [
@@ -44,26 +49,30 @@ const seed = {
 };
 
 async function loadInventory() {
-  if (!existsSync(inventoryPath)) {
-    await mkdir(dirname(inventoryPath), { recursive: true });
-    await writeFile(inventoryPath, JSON.stringify(seed, null, 2));
+  await initialize();
+  const data = await readStore("ringInventory");
+  if ((!data.batches || data.batches.length === 0) && (!data.rings || data.rings.length === 0)) {
+    await writeStore("ringInventory", seed);
+    return JSON.parse(JSON.stringify(seed));
   }
-  return JSON.parse(await readFile(inventoryPath, "utf8"));
+  return data;
 }
 
 async function saveInventory(inventory) {
-  await writeFile(inventoryPath, JSON.stringify(inventory, null, 2));
+  await initialize();
+  await writeStore("ringInventory", inventory);
 }
 
 async function loadBirds() {
-  return JSON.parse(await readFile(birdsPath, "utf8"));
+  await initialize();
+  return await loadLegacyCompatibleDb();
 }
 
 function formatRingNo(prefix, num) {
   return `${prefix}-${String(num).padStart(5, "0")}`;
 }
 
-async function createBatch({ prefix, startNo, endNo, season, description }) {
+export async function createBatch({ prefix, startNo, endNo, season, description }) {
   if (!prefix || typeof startNo !== "number" || typeof endNo !== "number" || startNo > endNo) {
     throw new Error("invalid_batch_params");
   }
@@ -123,7 +132,7 @@ async function createBatch({ prefix, startNo, endNo, season, description }) {
   return { batch, generated: newRings.length, conflicts: conflictRings };
 }
 
-async function listBatches({ season } = {}) {
+export async function listBatches({ season } = {}) {
   const inventory = await loadInventory();
   let batches = inventory.batches;
   if (season) {
@@ -140,7 +149,7 @@ async function listBatches({ season } = {}) {
   });
 }
 
-async function listRings({ status, batchId, ringNo } = {}) {
+export async function listRings({ status, batchId, ringNo } = {}) {
   const inventory = await loadInventory();
   let rings = inventory.rings;
   if (status) rings = rings.filter(r => r.status === status);
@@ -149,14 +158,14 @@ async function listRings({ status, batchId, ringNo } = {}) {
   return rings;
 }
 
-async function getNextAvailableRing(batchId) {
+export async function getNextAvailableRing(batchId) {
   const inventory = await loadInventory();
   let rings = inventory.rings.filter(r => r.status === "available");
   if (batchId) rings = rings.filter(r => r.batchId === batchId);
   return rings.sort((a, b) => a.ringNo.localeCompare(b.ringNo))[0] || null;
 }
 
-async function allocateRing({ ringNo, allocatedTo, season }) {
+export async function allocateRing({ ringNo, allocatedTo, season }) {
   if (!ringNo || !allocatedTo) {
     throw new Error("missing_params");
   }
@@ -193,7 +202,7 @@ async function allocateRing({ ringNo, allocatedTo, season }) {
   return ring;
 }
 
-async function releaseRing(ringNo) {
+export async function releaseRing(ringNo) {
   const inventory = await loadInventory();
   const ring = inventory.rings.find(r => r.ringNo === ringNo);
   if (!ring) {
@@ -222,7 +231,7 @@ async function releaseRing(ringNo) {
   return ring;
 }
 
-async function allocateNextAvailable({ batchId, allocatedTo, season }) {
+export async function allocateNextAvailable({ batchId, allocatedTo, season }) {
   const nextRing = await getNextAvailableRing(batchId);
   if (!nextRing) {
     throw new Error("no_available_rings");
@@ -230,7 +239,7 @@ async function allocateNextAvailable({ batchId, allocatedTo, season }) {
   return await allocateRing({ ringNo: nextRing.ringNo, allocatedTo, season });
 }
 
-async function syncAllocateRing(ringNo, allocatedTo) {
+export async function syncAllocateRing(ringNo, allocatedTo) {
   const inventory = await loadInventory();
   const ring = inventory.rings.find(r => r.ringNo === ringNo);
   if (!ring) return null;
@@ -253,21 +262,9 @@ async function syncAllocateRing(ringNo, allocatedTo) {
   return ring;
 }
 
-async function isRingAllocated(ringNo) {
+export async function isRingAllocated(ringNo) {
   const inventory = await loadInventory();
   const ring = inventory.rings.find(r => r.ringNo === ringNo);
   if (!ring) return false;
   return ring.status === "allocated";
 }
-
-export {
-  createBatch,
-  listBatches,
-  listRings,
-  getNextAvailableRing,
-  allocateRing,
-  releaseRing,
-  allocateNextAvailable,
-  syncAllocateRing,
-  isRingAllocated
-};

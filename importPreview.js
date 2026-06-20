@@ -1,7 +1,12 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  initialize,
+  loadLegacyCompatibleDb,
+  readBirdsStore,
+  readEventsStore,
+  writeBirdsStore,
+  writeEventsStore,
+  reassembleBirdFromEvents
+} from "./dataStore.js";
 import { randomUUID } from "node:crypto";
 import { syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
@@ -12,9 +17,6 @@ import {
   recordAuditLog,
   pickBirdKeyFields
 } from "./auditLog.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const birdsPath = join(__dirname, "data", "seabirds.json");
 
 const KNOWN_SPECIES = new Set([
   "黑尾鸥", "黑嘴鸥", "遗鸥", "红嘴鸥", "普通燕鸥",
@@ -38,12 +40,8 @@ function cleanupCache() {
 }
 
 async function loadBirds() {
-  if (!existsSync(birdsPath)) return { birds: [] };
-  return JSON.parse(await readFile(birdsPath, "utf8"));
-}
-
-async function saveBirds(db) {
-  await writeFile(birdsPath, JSON.stringify(db, null, 2));
+  await initialize();
+  return await loadLegacyCompatibleDb();
 }
 
 function buildKnownSpeciesSet(existingBirds) {
@@ -178,6 +176,7 @@ function getPreview(previewId) {
 }
 
 async function commitImport(previewId) {
+  await initialize();
   const preview = getPreview(previewId);
   if (!preview) {
     throw new Error("preview_not_found");
@@ -189,8 +188,9 @@ async function commitImport(previewId) {
     throw new Error("has_blocking_errors");
   }
 
-  const db = await loadBirds();
-  const existingRingNos = new Set(db.birds.map(b => b.ringNo));
+  const birdsStore = await readBirdsStore();
+  const eventsStore = await readEventsStore();
+  const existingRingNos = new Set(birdsStore.birds.map(b => b.ringNo));
   const imported = [];
   const skipped = [];
 
@@ -217,28 +217,41 @@ async function commitImport(previewId) {
       age: rec.age || null,
       capturePlace: rec.capturePlace || null,
       season: rec.season || null,
-      fieldSessionId: rec.fieldSessionId || null,
-      measurements: (rec.measurements || []).map(m => ({
-        ...m,
-        at: m.at || new Date().toISOString().slice(0, 10),
-        fieldSessionId: m.fieldSessionId || rec.fieldSessionId || null
-      })),
-      releases: (rec.releases || []).map(r => ({
-        ...r,
-        at: r.at || new Date().toISOString(),
-        fieldSessionId: r.fieldSessionId || rec.fieldSessionId || null
-      })),
-      recaptures: [],
-      observations: []
+      fieldSessionId: rec.fieldSessionId || null
     };
 
-    persistRiskToBird(bird);
-    db.birds.push(bird);
-    imported.push(bird);
+    const birdEvents = [];
+    const eventTypes = ["measurements", "releases", "recaptures", "observations"];
+    for (const type of eventTypes) {
+      const arr = (type === "recaptures" || type === "observations")
+        ? []
+        : (rec[type] || []);
+      for (let i = 0; i < arr.length; i++) {
+        const entry = { ...arr[i] };
+        if (type === "measurements" && !entry.at) entry.at = new Date().toISOString().slice(0, 10);
+        if (type === "releases" && !entry.at) entry.at = new Date().toISOString();
+        if (!entry.fieldSessionId && rec.fieldSessionId) entry.fieldSessionId = rec.fieldSessionId;
+        birdEvents.push({
+          ringNo: rec.ringNo,
+          eventType: type,
+          eventIndex: i,
+          data: entry
+        });
+      }
+    }
+
+    const assembledBird = reassembleBirdFromEvents(bird, birdEvents);
+    persistRiskToBird(assembledBird);
+    bird.healthRisk = assembledBird.healthRisk;
+
+    birdsStore.birds.push(bird);
+    eventsStore.events.push(...birdEvents);
+    imported.push(reassembleBirdFromEvents(bird, [...eventsStore.events, ...birdEvents]));
     existingRingNos.add(rec.ringNo);
   }
 
-  await saveBirds(db);
+  await writeBirdsStore(birdsStore);
+  await writeEventsStore(eventsStore);
 
   for (const bird of imported) {
     try {

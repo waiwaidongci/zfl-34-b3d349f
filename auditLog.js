@@ -1,13 +1,18 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  initialize,
+  readStore,
+  writeStore,
+  atomicWriteFile,
+  readJsonSafely
+} from "./dataStore.js";
 import { randomUUID } from "node:crypto";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const auditLogPath = join(__dirname, "data", "auditLogs.json");
 
-const OPERATION_TYPES = {
+export const OPERATION_TYPES = {
   BIRD_CREATE: "bird_create",
   BIRD_MEASUREMENT_APPEND: "bird_measurement_append",
   BIRD_RECAPTURE_APPEND: "bird_recapture_append",
@@ -27,7 +32,7 @@ const OPERATION_TYPES = {
   DICTIONARY_ENTRY_DELETE: "dictionary_entry_delete"
 };
 
-const TARGET_TYPES = {
+export const TARGET_TYPES = {
   BIRD: "bird",
   RING: "ring",
   RING_BATCH: "ring_batch",
@@ -41,23 +46,21 @@ function generateLogId() {
 }
 
 async function loadAuditLogs() {
-  if (!existsSync(auditLogPath)) {
-    await mkdir(dirname(auditLogPath), { recursive: true });
-    await writeFile(auditLogPath, JSON.stringify({ logs: [] }, null, 2));
+  await initialize();
+  const data = await readStore("auditLogs");
+  if (!data.logs || data.logs.length === 0) {
+    await atomicWriteFile(auditLogPath, { logs: [] });
     return { logs: [] };
   }
-  try {
-    return JSON.parse(await readFile(auditLogPath, "utf8"));
-  } catch (e) {
-    return { logs: [] };
-  }
+  return data;
 }
 
 async function saveAuditLogs(data) {
-  await writeFile(auditLogPath, JSON.stringify(data, null, 2));
+  await initialize();
+  await writeStore("auditLogs", data);
 }
 
-function pickBirdKeyFields(bird) {
+export function pickBirdKeyFields(bird) {
   if (!bird) return null;
   return {
     ringNo: bird.ringNo,
@@ -75,7 +78,7 @@ function pickBirdKeyFields(bird) {
   };
 }
 
-function pickRingKeyFields(ring) {
+export function pickRingKeyFields(ring) {
   if (!ring) return null;
   return {
     ringNo: ring.ringNo,
@@ -85,7 +88,7 @@ function pickRingKeyFields(ring) {
   };
 }
 
-function pickSessionKeyFields(session) {
+export function pickSessionKeyFields(session) {
   if (!session) return null;
   return {
     id: session.id,
@@ -98,7 +101,7 @@ function pickSessionKeyFields(session) {
   };
 }
 
-function pickDictEntryKeyFields(entry) {
+export function pickDictEntryKeyFields(entry) {
   if (!entry) return null;
   return {
     value: entry.value,
@@ -106,7 +109,7 @@ function pickDictEntryKeyFields(entry) {
   };
 }
 
-async function recordAuditLog({
+export async function recordAuditLog({
   operationType,
   targetType,
   targetId,
@@ -142,7 +145,7 @@ function normalizeDateFilter(d) {
   return String(d).slice(0, 10);
 }
 
-async function queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringNo, limit, offset } = {}) {
+export async function queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringNo, limit, offset } = {}) {
   const data = await loadAuditLogs();
   let logs = data.logs;
 
@@ -192,7 +195,7 @@ async function queryAuditLogs({ dateFrom, dateTo, operationType, targetId, ringN
   };
 }
 
-async function getAuditLogStats() {
+export async function getAuditLogStats() {
   const data = await loadAuditLogs();
   const logs = data.logs;
   const stats = {
@@ -209,15 +212,3 @@ async function getAuditLogStats() {
   }
   return stats;
 }
-
-export {
-  OPERATION_TYPES,
-  TARGET_TYPES,
-  recordAuditLog,
-  queryAuditLogs,
-  getAuditLogStats,
-  pickBirdKeyFields,
-  pickRingKeyFields,
-  pickSessionKeyFields,
-  pickDictEntryKeyFields
-};

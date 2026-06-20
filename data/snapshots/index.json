@@ -21,6 +21,28 @@
         "totalObservations": 1,
         "totalReleases": 1
       }
+    },
+    {
+      "snapshotId": "SNAP-20260620140835-adf55331",
+      "createdAt": "2026-06-20T14:08:35.829Z",
+      "fileName": "SNAP-20260620140835-adf55331.json",
+      "summary": {
+        "totalBirds": 4,
+        "speciesBreakdown": [
+          {
+            "species": "黑尾鸥",
+            "count": 3
+          },
+          {
+            "species": "红嘴鸥",
+            "count": 1
+          }
+        ],
+        "totalMeasurements": 3,
+        "totalRecaptures": 2,
+        "totalObservations": 1,
+        "totalReleases": 1
+      }
     }
   ]
 }

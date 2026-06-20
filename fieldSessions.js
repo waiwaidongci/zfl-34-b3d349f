@@ -1,17 +1,21 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  initialize,
+  loadLegacyCompatibleDb,
+  readStore,
+  writeStore,
+  atomicWriteFile
+} from "./dataStore.js";
 import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
   pickSessionKeyFields
 } from "./auditLog.js";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sessionsPath = join(__dirname, "data", "fieldSessions.json");
-const birdsPath = join(__dirname, "data", "seabirds.json");
 
 const seed = {
   fieldSessions: [
@@ -47,19 +51,23 @@ const seed = {
 };
 
 async function loadSessions() {
-  if (!existsSync(sessionsPath)) {
-    await mkdir(dirname(sessionsPath), { recursive: true });
-    await writeFile(sessionsPath, JSON.stringify(seed, null, 2));
+  await initialize();
+  const data = await readStore("fieldSessions");
+  if (!data.fieldSessions || data.fieldSessions.length === 0) {
+    await atomicWriteFile(sessionsPath, seed);
+    return JSON.parse(JSON.stringify(seed));
   }
-  return JSON.parse(await readFile(sessionsPath, "utf8"));
+  return data;
 }
 
 async function saveSessions(sessions) {
-  await writeFile(sessionsPath, JSON.stringify(sessions, null, 2));
+  await initialize();
+  await writeStore("fieldSessions", sessions);
 }
 
 async function loadBirds() {
-  return JSON.parse(await readFile(birdsPath, "utf8"));
+  await initialize();
+  return await loadLegacyCompatibleDb();
 }
 
 function generateSessionId(date) {
@@ -74,7 +82,7 @@ function normalizeDate(d) {
   return d.slice(0, 10);
 }
 
-async function createSession(input) {
+export async function createSession(input) {
   if (!input.date || !input.capturePlace || !input.season) {
     throw new Error("missing_required_fields");
   }
@@ -106,7 +114,7 @@ async function createSession(input) {
   return session;
 }
 
-async function listSessions({ season, capturePlace, dateFrom, dateTo } = {}) {
+export async function listSessions({ season, capturePlace, dateFrom, dateTo } = {}) {
   const sessions = await loadSessions();
   let result = sessions.fieldSessions;
   if (season) result = result.filter(s => s.season === season);
@@ -122,12 +130,12 @@ async function listSessions({ season, capturePlace, dateFrom, dateTo } = {}) {
   return result.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function getSession(id) {
+export async function getSession(id) {
   const sessions = await loadSessions();
   return sessions.fieldSessions.find(s => s.id === id) || null;
 }
 
-async function updateSession(id, input) {
+export async function updateSession(id, input) {
   const sessions = await loadSessions();
   const idx = sessions.fieldSessions.findIndex(s => s.id === id);
   if (idx === -1) throw new Error("session_not_found");
@@ -154,7 +162,7 @@ async function updateSession(id, input) {
   return updated;
 }
 
-async function deleteSession(id) {
+export async function deleteSession(id) {
   const sessions = await loadSessions();
   const idx = sessions.fieldSessions.findIndex(s => s.id === id);
   if (idx === -1) throw new Error("session_not_found");
@@ -173,7 +181,7 @@ async function deleteSession(id) {
   return true;
 }
 
-async function getSessionSummary({ season, capturePlace, dateFrom, dateTo } = {}) {
+export async function getSessionSummary({ season, capturePlace, dateFrom, dateTo } = {}) {
   const sessions = await listSessions({ season, capturePlace, dateFrom, dateTo });
   const birds = await loadBirds();
 
@@ -239,7 +247,7 @@ async function getSessionSummary({ season, capturePlace, dateFrom, dateTo } = {}
   });
 }
 
-async function getSessionDetail(id) {
+export async function getSessionDetail(id) {
   const session = await getSession(id);
   if (!session) return null;
 
@@ -280,13 +288,3 @@ async function getSessionDetail(id) {
     recapturedBirds: recaptureBirds
   };
 }
-
-export {
-  createSession,
-  listSessions,
-  getSession,
-  updateSession,
-  deleteSession,
-  getSessionSummary,
-  getSessionDetail
-};

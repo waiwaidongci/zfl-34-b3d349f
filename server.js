@@ -1,10 +1,8 @@
 import http from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { initialize as initDataStore, getMigrationState } from "./dataStore.js";
 import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
-import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
 import { createPreview, getPreview, commitImport } from "./importPreview.js";
 import {
   createSession,
@@ -17,12 +15,6 @@ import {
 } from "./fieldSessions.js";
 import { handleMigrationRoutes } from "./migrationRoutes.js";
 import { handleBackupRoutes } from "./backupRoutes.js";
-import {
-  calculateBirdRisk,
-  getRiskSummary,
-  persistRiskToBird,
-  persistRiskToAllBirds
-} from "./healthRisk.js";
 import {
   DICTIONARY_TYPES,
   loadDictionaries,
@@ -37,42 +29,24 @@ import {
 import {
   OPERATION_TYPES,
   TARGET_TYPES,
-  recordAuditLog,
   queryAuditLogs,
-  getAuditLogStats,
-  pickBirdKeyFields
+  getAuditLogStats
 } from "./auditLog.js";
+import {
+  listBirds,
+  findBirdByRingNo,
+  createBird,
+  getBirdHistory,
+  recalculateBirdHealthRisk,
+  appendBirdEvent,
+  getHealthRiskReport,
+  recalculateAllBirdsHealthRisk,
+  getRecaptureRateReport
+} from "./birdsService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, "data", "seabirds.json");
 const port = Number(process.env.PORT || 3034);
 
-const seed = {
-  birds: [
-    {
-      ringNo: "SB-26001",
-      species: "黑尾鸥",
-      sex: "unknown",
-      age: "adult",
-      capturePlace: "东礁A区",
-      season: "2026春",
-      fieldSessionId: "FS-2026-0503-001",
-      measurements: [{ at: "2026-05-03", wing: 328, weight: 512, bill: 44, fieldSessionId: "FS-2026-0503-001" }],
-      releases: [{ at: "2026-05-03T09:40:00.000Z", place: "东礁A区", fieldSessionId: "FS-2026-0503-001" }],
-      recaptures: [{ at: "2026-06-11", place: "东礁B区", note: "换羽正常", fieldSessionId: "FS-2026-0611-001" }],
-      observations: [{ at: "2026-06-15", point: "N30.1,E122.3", note: "近岸盘旋" }]
-    }
-  ]
-};
-
-async function loadDb() {
-  if (!existsSync(dbPath)) {
-    await mkdir(dirname(dbPath), { recursive: true });
-    await writeFile(dbPath, JSON.stringify(seed, null, 2));
-  }
-  return JSON.parse(await readFile(dbPath, "utf8"));
-}
-async function saveDb(db) { await writeFile(dbPath, JSON.stringify(db, null, 2)); }
 async function body(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -108,17 +82,34 @@ function buildDictValidationError(results) {
   };
 }
 
+function mapBirdServiceError(e) {
+  switch (e.message) {
+    case "ring_exists":
+      return { status: 409, error: "ring_exists", message: "环号已存在" };
+    case "ring_allocated_in_inventory":
+      return { status: 409, error: "ring_allocated_in_inventory", message: e.message || "该环号在库存中已被占用" };
+    case "dictionary_validation_failed":
+      return {
+        status: 400,
+        error: "dictionary_validation_failed",
+        message: e.validationMessage || "字典校验失败",
+        details: e.details || []
+      };
+    default:
+      return null;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const db = await loadDb();
 
     if (url.pathname.startsWith("/ring-inventory/")) {
       const handled = await handleRingInventoryRoutes(req, res, url, body);
       if (handled !== false) return;
     }
 
-    const migrationHandled = handleMigrationRoutes(req, res, url, db, send);
+    const migrationHandled = await handleMigrationRoutes(req, res, url, send);
     if (migrationHandled !== false) return;
 
     const backupHandled = await handleBackupRoutes(req, res, url, send);
@@ -131,7 +122,8 @@ const server = http.createServer(async (req, res) => {
           return send(res, 400, { error: "invalid_input", message: "请求体需包含 records 数组" });
         }
         try {
-          const preview = await createPreview(input.records, db.birds);
+          const birds = await listBirds();
+          const preview = await createPreview(input.records, birds);
           return send(res, 200, {
             previewId: preview.previewId,
             status: preview.status,
@@ -326,6 +318,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/") return send(res, 200, {
       service: "海鸟环志站API",
+      dataStore: {
+        migrationState: getMigrationState(),
+        structure: ["birds.json", "events.json", "reports.json", "dictionaries.json", "fieldSessions.json", "ringInventory.json", "auditLogs.json"]
+      },
       endpoints: [
         "GET /birds", "POST /birds",
         "GET /birds/:ringNo/history",
@@ -356,171 +352,70 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/birds") {
       const species = url.searchParams.get("species");
-      return send(res, 200, species ? db.birds.filter(b => b.species === species) : db.birds);
+      const birds = await listBirds({ species });
+      return send(res, 200, birds);
     }
     if (req.method === "POST" && url.pathname === "/birds") {
       const input = await body(req);
-      const birdValidations = await validateDictionaryValues([
-        { type: "species", value: input.species, allowEmpty: false },
-        { type: "capturePlace", value: input.capturePlace, allowEmpty: true },
-        { type: "season", value: input.season, allowEmpty: true }
-      ]);
-      const birdDictError = buildDictValidationError(birdValidations);
-      if (birdDictError) return send(res, birdDictError.status, birdDictError);
-      if (db.birds.some(b => b.ringNo === input.ringNo)) return send(res, 409, { error: "ring_exists" });
-      if (await isRingAllocated(input.ringNo)) return send(res, 409, { error: "ring_allocated_in_inventory", message: "该环号在库存中已被占用" });
-      const bird = {
-        ringNo: input.ringNo,
-        species: input.species,
-        sex: input.sex || "unknown",
-        age: input.age,
-        capturePlace: input.capturePlace,
-        season: input.season,
-        fieldSessionId: input.fieldSessionId || null,
-        measurements: (input.measurements || []).map(m => ({
-          ...m,
-          at: m.at || new Date().toISOString().slice(0, 10),
-          fieldSessionId: m.fieldSessionId || input.fieldSessionId || null
-        })),
-        releases: (input.releases || []).map(r => ({
-          ...r,
-          at: r.at || new Date().toISOString(),
-          fieldSessionId: r.fieldSessionId || input.fieldSessionId || null
-        })),
-        recaptures: [],
-        observations: []
-      };
-      persistRiskToBird(bird);
-      db.birds.push(bird);
-      await saveDb(db);
-      await syncAllocateRing(input.ringNo, input.ringNo);
-      recordAuditLog({
-        operationType: OPERATION_TYPES.BIRD_CREATE,
-        targetType: TARGET_TYPES.BIRD,
-        targetId: bird.ringNo,
-        requestSummary: { ringNo: input.ringNo, species: input.species, sex: input.sex, age: input.age, capturePlace: input.capturePlace, season: input.season },
-        before: null,
-        after: pickBirdKeyFields(bird)
-      });
-      return send(res, 201, bird);
+      try {
+        const bird = await createBird(input);
+        return send(res, 201, bird);
+      } catch (e) {
+        const mapped = mapBirdServiceError(e);
+        if (mapped) return send(res, mapped.status, mapped);
+        throw e;
+      }
     }
     const actionMatch = url.pathname.match(/^\/birds\/([^/]+)\/(history|measurements|recaptures|observations|releases|health-risk)$/);
     if (actionMatch) {
-      const bird = db.birds.find(b => b.ringNo === decodeURIComponent(actionMatch[1]));
-      if (!bird) return send(res, 404, { error: "bird_not_found" });
+      const ringNo = decodeURIComponent(actionMatch[1]);
       const action = actionMatch[2];
+
       if (req.method === "GET" && action === "history") {
-        const responseBird = { ...bird };
-        return send(res, 200, responseBird);
+        const bird = await getBirdHistory(ringNo);
+        if (!bird) return send(res, 404, { error: "bird_not_found" });
+        return send(res, 200, bird);
       }
       if (req.method === "POST" && action === "health-risk") {
-        const beforeBird = pickBirdKeyFields(bird);
-        const risk = calculateBirdRisk(bird);
-        bird.healthRisk = risk;
-        await saveDb(db);
-        recordAuditLog({
-          operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
-          targetType: TARGET_TYPES.BIRD,
-          targetId: bird.ringNo,
-          requestSummary: { action: "recalculate_health_risk" },
-          before: beforeBird,
-          after: pickBirdKeyFields(bird)
-        });
-        return send(res, 200, { ringNo: bird.ringNo, healthRisk: risk });
+        const result = await recalculateBirdHealthRisk(ringNo, false);
+        if (!result) return send(res, 404, { error: "bird_not_found" });
+        return send(res, 200, { ringNo: result.ringNo, healthRisk: result.healthRisk });
       }
       if (req.method === "POST" && action !== "history" && action !== "health-risk") {
         const input = await body(req);
-        if ((action === "recaptures" || action === "releases" || action === "observations") && input.place) {
-          const placeValidation = await validateDictionaryValue("capturePlace", input.place, { allowEmpty: true });
-          const placeDictError = buildDictValidationError([placeValidation]);
-          if (placeDictError) return send(res, placeDictError.status, placeDictError);
+        try {
+          const bird = await appendBirdEvent(ringNo, action, input);
+          if (!bird) return send(res, 404, { error: "bird_not_found" });
+          return send(res, 201, bird);
+        } catch (e) {
+          const mapped = mapBirdServiceError(e);
+          if (mapped) return send(res, mapped.status, mapped);
+          throw e;
         }
-        const beforeBird = pickBirdKeyFields(bird);
-        const newEntry = {
-          at: input.at || (action === "measurements" ? new Date().toISOString().slice(0, 10) : new Date().toISOString()),
-          ...input
-        };
-        bird[action].push(newEntry);
-        persistRiskToBird(bird);
-        await saveDb(db);
-        const opTypeMap = {
-          measurements: OPERATION_TYPES.BIRD_MEASUREMENT_APPEND,
-          recaptures: OPERATION_TYPES.BIRD_RECAPTURE_APPEND,
-          observations: OPERATION_TYPES.BIRD_OBSERVATION_APPEND,
-          releases: OPERATION_TYPES.BIRD_RELEASE_APPEND
-        };
-        recordAuditLog({
-          operationType: opTypeMap[action],
-          targetType: TARGET_TYPES.BIRD,
-          targetId: bird.ringNo,
-          requestSummary: { action, entry: newEntry },
-          before: beforeBird,
-          after: pickBirdKeyFields(bird)
-        });
-        return send(res, 201, bird);
       }
     }
 
     const healthRiskRecalcMatch = url.pathname.match(/^\/birds\/([^/]+)\/health-risk\/recalculate$/);
     if (healthRiskRecalcMatch && req.method === "POST") {
-      const bird = db.birds.find(b => b.ringNo === decodeURIComponent(healthRiskRecalcMatch[1]));
-      if (!bird) return send(res, 404, { error: "bird_not_found" });
-      const beforeBird = pickBirdKeyFields(bird);
-      const risk = calculateBirdRisk(bird);
-      bird.healthRisk = risk;
-      await saveDb(db);
-      recordAuditLog({
-        operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
-        targetType: TARGET_TYPES.BIRD,
-        targetId: bird.ringNo,
-        requestSummary: { action: "recalculate_health_risk_explicit" },
-        before: beforeBird,
-        after: pickBirdKeyFields(bird)
-      });
-      return send(res, 200, {
-        ringNo: bird.ringNo,
-        species: bird.species,
-        healthRisk: risk
-      });
+      const ringNo = decodeURIComponent(healthRiskRecalcMatch[1]);
+      const result = await recalculateBirdHealthRisk(ringNo, true);
+      if (!result) return send(res, 404, { error: "bird_not_found" });
+      return send(res, 200, result);
     }
 
     if (req.method === "GET" && url.pathname === "/health-risk/report") {
-      const summary = getRiskSummary(db.birds);
+      const summary = await getHealthRiskReport();
       return send(res, 200, summary);
     }
 
     if (req.method === "POST" && url.pathname === "/health-risk/recalculate-all") {
-      persistRiskToAllBirds(db.birds);
-      await saveDb(db);
-      const summary = getRiskSummary(db.birds);
-      recordAuditLog({
-        operationType: OPERATION_TYPES.ALL_HEALTH_RISK_RECALCULATE,
-        targetType: TARGET_TYPES.SYSTEM,
-        targetId: "system",
-        requestSummary: { recalculatedCount: db.birds.length },
-        before: null,
-        after: { total: summary.total, byLevel: summary.byLevel }
-      });
-      return send(res, 200, {
-        message: "已重新计算全库健康风险",
-        recalculatedCount: db.birds.length,
-        summary: {
-          total: summary.total,
-          byLevel: summary.byLevel,
-          byFactorType: summary.byFactorType
-        }
-      });
+      const result = await recalculateAllBirdsHealthRisk();
+      return send(res, 200, result);
     }
     if (req.method === "GET" && url.pathname === "/reports/recapture-rate") {
       const season = url.searchParams.get("season");
-      const birds = season ? db.birds.filter(b => b.season === season) : db.birds;
-      const bySpecies = {};
-      for (const bird of birds) {
-        bySpecies[bird.species] ||= { species: bird.species, banded: 0, recaptured: 0 };
-        bySpecies[bird.species].banded += 1;
-        if (bird.recaptures.length) bySpecies[bird.species].recaptured += 1;
-      }
-      return send(res, 200, Object.values(bySpecies).map(row => ({ ...row, rate: row.banded ? Number((row.recaptured / row.banded).toFixed(3)) : 0 })));
+      const report = await getRecaptureRateReport({ season });
+      return send(res, 200, report);
     }
 
     if (url.pathname.startsWith("/audit-logs")) {
@@ -553,4 +448,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => console.log(`Seabird banding API listening on http://localhost:${port}`));
+async function startServer() {
+  await initDataStore();
+  server.listen(port, () => console.log(`Seabird banding API listening on http://localhost:${port}`));
+}
+
+startServer();

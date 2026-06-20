@@ -1,20 +1,25 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  initialize,
+  loadLegacyCompatibleDb,
+  readStore,
+  writeStore,
+  readJsonSafely,
+  atomicWriteFile
+} from "./dataStore.js";
 import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
   pickDictEntryKeyFields
 } from "./auditLog.js";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dictPath = join(__dirname, "data", "dictionaries.json");
-const birdsPath = join(__dirname, "data", "seabirds.json");
 const sessionsPath = join(__dirname, "data", "fieldSessions.json");
 
-const DICTIONARY_TYPES = ["species", "capturePlace", "season"];
+export const DICTIONARY_TYPES = ["species", "capturePlace", "season"];
 
 const MANDATORY_SEED = {
   species: ["黑尾鸥"],
@@ -33,8 +38,8 @@ function buildEntry(value, description = null) {
 
 async function loadBirdsSafely() {
   try {
-    if (!existsSync(birdsPath)) return { birds: [] };
-    return JSON.parse(await readFile(birdsPath, "utf8"));
+    await initialize();
+    return await loadLegacyCompatibleDb();
   } catch (_) {
     return { birds: [] };
   }
@@ -42,8 +47,7 @@ async function loadBirdsSafely() {
 
 async function loadSessionsSafely() {
   try {
-    if (!existsSync(sessionsPath)) return { fieldSessions: [] };
-    return JSON.parse(await readFile(sessionsPath, "utf8"));
+    return await readJsonSafely(sessionsPath, { fieldSessions: [] });
   } catch (_) {
     return { fieldSessions: [] };
   }
@@ -75,14 +79,21 @@ async function buildInitialDictionaries() {
   return dict;
 }
 
-async function loadDictionaries() {
-  if (!existsSync(dictPath)) {
-    await mkdir(dirname(dictPath), { recursive: true });
+export async function loadDictionaries() {
+  await initialize();
+  const data = await readStore("dictionaries");
+  let needsInit = false;
+  for (const type of DICTIONARY_TYPES) {
+    if (!Array.isArray(data[type]) || data[type].length === 0) {
+      needsInit = true;
+      break;
+    }
+  }
+  if (needsInit) {
     const initial = await buildInitialDictionaries();
-    await writeFile(dictPath, JSON.stringify(initial, null, 2));
+    await atomicWriteFile(dictPath, initial);
     return initial;
   }
-  const data = JSON.parse(await readFile(dictPath, "utf8"));
   for (const type of DICTIONARY_TYPES) {
     if (!Array.isArray(data[type])) data[type] = [];
   }
@@ -90,24 +101,25 @@ async function loadDictionaries() {
 }
 
 async function saveDictionaries(dict) {
-  await writeFile(dictPath, JSON.stringify(dict, null, 2));
+  await initialize();
+  await writeStore("dictionaries", dict);
 }
 
-function isValidType(type) {
+export function isValidType(type) {
   return DICTIONARY_TYPES.includes(type);
 }
 
-function listDictionary(dict, type) {
+export function listDictionary(dict, type) {
   if (!isValidType(type)) return null;
   return dict[type] || [];
 }
 
-function findEntry(dict, type, value) {
+export function findEntry(dict, type, value) {
   if (!isValidType(type)) return null;
   return (dict[type] || []).find(e => e.value === value) || null;
 }
 
-async function addDictionaryEntry(type, value, description = null) {
+export async function addDictionaryEntry(type, value, description = null) {
   if (!isValidType(type)) throw new Error("invalid_dictionary_type");
   if (!value || typeof value !== "string" || value.trim().length === 0) {
     throw new Error("invalid_value");
@@ -128,7 +140,7 @@ async function addDictionaryEntry(type, value, description = null) {
   return entry;
 }
 
-async function updateDictionaryEntry(type, oldValue, newValue, description) {
+export async function updateDictionaryEntry(type, oldValue, newValue, description) {
   if (!isValidType(type)) throw new Error("invalid_dictionary_type");
   if (!oldValue || typeof oldValue !== "string") throw new Error("invalid_old_value");
   const dict = await loadDictionaries();
@@ -154,7 +166,7 @@ async function updateDictionaryEntry(type, oldValue, newValue, description) {
   return entry;
 }
 
-async function deleteDictionaryEntry(type, value) {
+export async function deleteDictionaryEntry(type, value) {
   if (!isValidType(type)) throw new Error("invalid_dictionary_type");
   if (!value || typeof value !== "string") throw new Error("invalid_value");
   const dict = await loadDictionaries();
@@ -175,7 +187,7 @@ async function deleteDictionaryEntry(type, value) {
   return true;
 }
 
-async function validateDictionaryValue(type, value, { allowEmpty = true } = {}) {
+export async function validateDictionaryValue(type, value, { allowEmpty = true } = {}) {
   if (!isValidType(type)) throw new Error("invalid_dictionary_type");
   if (value === undefined || value === null || value === "") {
     if (allowEmpty) return { valid: true };
@@ -187,7 +199,7 @@ async function validateDictionaryValue(type, value, { allowEmpty = true } = {}) 
   return { valid: false, type, value, reason: "not_in_dictionary" };
 }
 
-async function validateDictionaryValues(validations) {
+export async function validateDictionaryValues(validations) {
   const results = [];
   for (const { type, value, allowEmpty } of validations) {
     results.push(await validateDictionaryValue(type, value, { allowEmpty }));
@@ -195,7 +207,7 @@ async function validateDictionaryValues(validations) {
   return results;
 }
 
-function mapDictError(e) {
+export function mapDictError(e) {
   switch (e.message) {
     case "invalid_dictionary_type":
       return { status: 400, error: "invalid_dictionary_type", message: `无效的字典类型，支持: ${DICTIONARY_TYPES.join(", ")}` };
@@ -213,18 +225,3 @@ function mapDictError(e) {
       return { status: 500, error: e.message };
   }
 }
-
-export {
-  DICTIONARY_TYPES,
-  loadDictionaries,
-  saveDictionaries,
-  isValidType,
-  listDictionary,
-  findEntry,
-  addDictionaryEntry,
-  updateDictionaryEntry,
-  deleteDictionaryEntry,
-  validateDictionaryValue,
-  validateDictionaryValues,
-  mapDictError
-};

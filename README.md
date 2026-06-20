@@ -10,6 +10,259 @@ npm start
 
 ---
 
+## 多文件数据仓库架构（v2）
+
+### 架构概述
+
+将原来的单文件 `data/seabirds.json` 拆分为**按数据类型分开的 JSON 文件**，通过独立的数据访问层 `dataStore.js` 统一管理，实现：
+
+- ✅ **首次启动自动迁移**：检测到 `data/seabirds.json` 时自动拆分并生成新结构
+- ✅ **API 完全兼容**：所有现有接口的请求/响应格式与旧版完全一致
+- ✅ **原子写入防半写**：写文件采用「临时文件 → rename」两步法，进程中断不会损坏主文件
+- ✅ **server.js 瘦身**：仅负责路由分发，所有业务逻辑下沉到 `birdsService.js` 等服务层
+
+### 物理文件结构
+
+```
+data/
+├── birds.json          # 鸟类主档案（不含子记录数组）
+├── events.json         # 所有事件子记录（measurements/releases/recaptures/observations）
+├── reports.json        # 报表缓存（预留扩展）
+├── dictionaries.json   # 字典（已独立）
+├── fieldSessions.json  # 野外作业场次（已独立）
+├── ringInventory.json  # 环号库存（已独立）
+├── auditLogs.json      # 审计日志（已独立）
+├── seabirds.json       # 旧文件（迁移时读取，迁移后可手动删除）
+└── snapshots/          # 备份快照目录
+```
+
+### birds.json 结构（鸟类主档案）
+
+```json
+{
+  "birds": [
+    {
+      "ringNo": "SB-26001",
+      "species": "黑尾鸥",
+      "sex": "unknown",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": { "level": "low", "score": 0, "...": "..." }
+    }
+  ]
+}
+```
+
+### events.json 结构（事件记录扁平化）
+
+```json
+{
+  "events": [
+    {
+      "ringNo": "SB-26001",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": { "at": "2026-05-03", "wing": 328, "weight": 512, "bill": 44, "fieldSessionId": "FS-2026-0503-001" }
+    },
+    {
+      "ringNo": "SB-26001",
+      "eventType": "recaptures",
+      "eventIndex": 0,
+      "data": { "at": "2026-06-11", "place": "东礁B区", "note": "换羽正常", "fieldSessionId": "FS-2026-0611-001" }
+    }
+  ]
+}
+```
+
+`eventType` 取值：`measurements` | `releases` | `recaptures` | `observations`
+`eventIndex`：保证同一鸟同一类型内按原顺序还原。
+
+### 模块分层图
+
+```
+┌─────────────────────────────────────────────────┐
+│                   server.js                     │
+│  (HTTP 路由分发 + 错误映射，无直接文件读写)      │
+└─────────────────────┬───────────────────────────┘
+                      │
+     ┌────────────────┼────────────────┐
+     ▼                ▼                ▼
+ birdsService.js   fieldSessions.js   ringInventory.js
+ dictionaries.js   importPreview.js   backupService.js
+ migrationRoutes   auditLog.js        healthRisk.js
+     │                │                │
+     └────────────────┼────────────────┘
+                      ▼
+             ┌─────────────────┐
+             │   dataStore.js  │  ← 统一数据访问层
+             │  - 自动迁移     │
+             │  - 原子写入     │
+             │  - 组装/拆分    │
+             └────────┬────────┘
+                      ▼
+             data/*.json (多文件)
+```
+
+### 原子写入机制
+
+所有写操作通过 `dataStore.atomicWriteFile(filePath, data)`：
+
+```
+1. JSON.stringify(data) → 生成完整字符串
+2. writeFile("xxx.json.tmp.<时间戳>-<随机串>") → 写到临时文件
+3. rename("临时文件", "xxx.json") → 原子替换
+```
+
+进程在步骤 1/2 中断：主文件毫发无损（仍是旧版本）
+进程在步骤 3 中断：取决于操作系统，现代文件系统的 rename 是原子的。
+遗留的 `.tmp.*` 文件可以手动清理，不影响数据完整性。
+
+### 数据迁移 README 流程
+
+---
+
+#### 场景 A：已有 `data/seabirds.json` 旧数据 → 首次启动自动迁移
+
+**迁移前验证：**
+
+```bash
+# 1. 确认旧数据存在
+ls -la data/seabirds.json
+
+# 2. 统计旧数据中的鸟数量
+python3 -c "import json; d=json.load(open('data/seabirds.json')); print('旧库鸟数:', len(d['birds']))"
+
+# 3. 先备份旧文件
+cp data/seabirds.json data/seabirds.json.backup-$(date +%Y%m%d-%H%M%S)
+
+# 4. 确认新文件不存在（首次迁移）
+ls data/birds.json data/events.json data/reports.json 2>/dev/null || echo "新结构文件不存在，将执行迁移"
+```
+
+**执行迁移（就是启动服务）：**
+
+```bash
+npm start
+```
+
+预期控制台输出（出现迁移日志）：
+```
+[dataStore] 数据结构初始化完成 (从旧文件迁移: 4 birds, 10 events)
+Seabird banding API listening on http://localhost:3034
+```
+
+**迁移后验证（curl 逐步验证）：**
+
+```bash
+# 1. 根路由 - 查看迁移状态（migrationState.hasMigrated=true）
+curl -s http://localhost:3034/ | python3 -m json.tool
+
+# 2. GET /birds - 鸟类总数应与旧库一致
+curl -s http://localhost:3034/birds | python3 -c "import sys,json; d=json.load(sys.stdin); print('迁移后鸟数:', len(d), '鸟环号列表:', [b['ringNo'] for b in d])"
+
+# 3. GET /birds/SB-26001/history - 子记录完整（measurements/releases/recaptures/observations 都在）
+curl -s http://localhost:3034/birds/SB-26001/history | python3 -m json.tool
+
+# 4. 统计 - 复捕率应与旧数据一致
+curl -s 'http://localhost:3034/reports/recapture-rate?season=2026春' | python3 -m json.tool
+
+# 5. 统计 - 健康风险报告
+curl -s http://localhost:3034/health-risk/report | python3 -c "import sys,json; d=json.load(sys.stdin); print('总数:', d['total'], '按等级:', d['byLevel'])"
+
+# 6. 比对物理文件
+echo "=== 新结构文件 ==="
+ls -la data/birds.json data/events.json data/reports.json
+echo "=== birds.json 鸟数 ==="
+python3 -c "import json; d=json.load(open('data/birds.json')); print(len(d['birds']))"
+echo "=== events.json 按类型分组 ==="
+python3 -c "
+import json
+from collections import Counter
+d = json.load(open('data/events.json'))
+print('事件总数:', len(d['events']))
+print('按类型:', dict(Counter(e['eventType'] for e in d['events'])))
+print('按环号:', dict(Counter(e['ringNo'] for e in d['events'])))
+"
+
+# 7. 验证字典自动迁移 - GET /dictionaries
+curl -s http://localhost:3034/dictionaries | python3 -m json.tool
+```
+
+**写操作完整性验证（追加一条复捕）：**
+
+```bash
+# 1. 先追加一条复捕记录
+curl -s -X POST http://localhost:3034/birds/SB-26001/recaptures \
+  -H 'Content-Type: application/json' \
+  -d '{"at":"2026-06-20","place":"东礁A区","note":"验证原子写入-正常换羽"}' \
+  | python3 -m json.tool
+
+# 2. 再次 GET 历史确认写入
+curl -s http://localhost:3034/birds/SB-26001/history | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print('复捕记录数:', len(d['recaptures']))
+for r in d['recaptures']: print(' -', r['at'], r['place'], r.get('note',''))
+"
+
+# 3. 验证物理文件：events.json 有这条新记录
+python3 -c "
+import json
+d = json.load(open('data/events.json'))
+new_events = [e for e in d['events'] if e['eventType']=='recaptures' and e['data'].get('note','').startswith('验证原子写入')]
+print('新增事件数:', len(new_events))
+print(new_events[0] if new_events else '未找到')
+"
+
+# 4. 模拟写入中进程被 kill（可选，验证半写入防护）：
+#    - 手动在写入时杀进程，重启后 birds.json/events.json 仍能正常解析
+```
+
+---
+
+#### 场景 B：全新部署（没有旧数据）
+
+系统会自动写入种子数据（SB-26001 及其 4 条事件记录）。
+
+```bash
+rm -rf data/birds.json data/events.json data/reports.json
+npm start
+```
+
+验证：
+
+```bash
+curl -s http://localhost:3034/birds | python3 -c "import sys,json; d=json.load(sys.stdin); print('种子鸟数:', len(d), '种子鸟:', [b['ringNo'] for b in d])"
+```
+
+---
+
+#### 场景 C：备份/恢复 - 快照与新结构协作
+
+快照格式保持**兼容视图**不变（即快照 data 字段仍是旧的 `{birds:[...]}` 结构），但恢复时会自动拆分回 `birds.json + events.json`。
+
+```bash
+# 1. 创建快照
+curl -s -X POST http://localhost:3034/backups/snapshots | python3 -m json.tool
+
+# 2. 故意写坏数据 - 新增一条鸟
+curl -s -X POST http://localhost:3034/birds \
+  -H 'Content-Type: application/json' \
+  -d '{"ringNo":"SB-26999","species":"黑尾鸥","sex":"unknown","capturePlace":"东礁A区","season":"2026春"}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('新增:', d.get('ringNo'))"
+
+# 3. 恢复快照（用上面步骤 1 返回的 snapshotId）
+# curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m json.tool
+
+# 4. 验证 SB-26999 已消失
+curl -s http://localhost:3034/birds/SB-26999/history -o /dev/null -w "HTTP状态: %{http_code}\n"
+# 预期：HTTP 404（已被恢复删除）
+```
+
+---
+
 ## 物种与站点字典模块
 
 将 `species`（物种）、`capturePlace`（环志礁区）、`season`（环志季节）从自由文本逐步收敛为可维护字典。所有新建鸟档案、作业场次、复捕/放飞记录时均会校验对应字段是否存在于字典中。
