@@ -6,7 +6,145 @@
 npm start
 ```
 
-默认端口`3034`。支持环号唯一档案、测量、复捕、迁徙观测、复捕率统计、**野外作业场次**管理，以及**环号库存与批次发放**管理。
+默认端口`3034`。支持环号唯一档案、测量、复捕、迁徙观测、复捕率统计、**野外作业场次**管理，以及**环号库存与批次发放**管理，并提供**物种与站点字典**模块用于收敛 `species`、`capturePlace`、`season` 字段的取值。
+
+---
+
+## 物种与站点字典模块
+
+将 `species`（物种）、`capturePlace`（环志礁区）、`season`（环志季节）从自由文本逐步收敛为可维护字典。所有新建鸟档案、作业场次、复捕/放飞记录时均会校验对应字段是否存在于字典中。
+
+### 数据存储
+
+字典数据存储在 `data/dictionaries.json`：
+
+```json
+{
+  "species": [
+    { "value": "黑尾鸥", "description": null, "createdAt": "...", "updatedAt": "..." }
+  ],
+  "capturePlace": [
+    { "value": "东礁A区", "description": null, "createdAt": "...", "updatedAt": "..." }
+  ],
+  "season": [
+    { "value": "2026春", "description": null, "createdAt": "...", "updatedAt": "..." }
+  ]
+}
+```
+
+### 自动迁移历史数据
+
+首次启动时，若 `data/dictionaries.json` 不存在，系统会自动：
+
+1. 预置强制迁移值：**黑尾鸥**（species）、**东礁A区**（capturePlace）、**东礁B区**（capturePlace）、**2026春**（season）
+2. 扫描现有 `data/seabirds.json` 和 `data/fieldSessions.json`，收集全部已有的 `species`、`capturePlace`、`season` 值，一并写入字典
+
+### 兼容旧数据的行为
+
+- **读取操作**：所有查询接口（`GET /birds`、`GET /field-sessions` 等）**不受字典约束**，历史数据中不在字典内的值仍可正常读取和展示
+- **新建操作**：`POST /birds`、`POST /field-sessions`、`POST /birds/:ringNo/recaptures`、`POST /birds/:ringNo/releases` 等新建接口**强制校验**字典值，若值不在字典中则返回 400 错误，提示先在字典中添加
+- **更新操作**：`PUT /field-sessions/:id` 若更新 `season` 或 `capturePlace` 字段，则校验新值；未涉及的字段不校验
+- **批量导入**：`POST /import/preview` 会校验每条记录的 `species`、`capturePlace`、`season`，不在字典中的值以警告形式返回（`unknownSpecies`、`dictValidationErrors`），但不阻断导入；`POST /import/commit/:previewId` 在实际写入时同样强制执行字典校验
+- **字典删除**：删除字典条目不会影响已存在的历史数据，但之后新建记录无法再使用该值
+
+### 1. 查询字典总览
+
+**GET /dictionaries**
+
+返回所有字典类型及各类型的条目数量：
+
+```json
+{
+  "types": ["species", "capturePlace", "season"],
+  "counts": {
+    "species": 2,
+    "capturePlace": 2,
+    "season": 1
+  }
+}
+```
+
+### 2. 查询指定字典的所有条目
+
+**GET /dictionaries/:type**
+
+`:type` 可选值：`species` | `capturePlace` | `season`
+
+示例 `GET /dictionaries/species` 响应（200）：
+
+```json
+[
+  {
+    "value": "黑尾鸥",
+    "description": null,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]
+```
+
+### 3. 新增字典条目
+
+**POST /dictionaries/:type**
+
+请求体：
+
+```json
+{
+  "value": "黑嘴鸥",
+  "description": "Saunders's Gull，易危物种"
+}
+```
+
+- `value` 必填，不能为空，同一字典内不可重复
+- `description` 可选，默认为 `null`
+
+响应（201）：返回新建的完整字典条目对象。
+
+冲突时返回 409 `entry_already_exists`。
+
+### 4. 更新字典条目
+
+**PUT /dictionaries/:type/:value**
+
+`:value` 为 URL 编码后的当前字典值。
+
+请求体（可部分更新）：
+
+```json
+{
+  "value": "黑嘴鸥（新名）",
+  "description": "更新后的描述"
+}
+```
+
+- 仅传 `description` 可只修改描述
+- 修改 `value` 时新值不能与同字典已有值重复
+
+响应（200）：返回更新后的完整字典条目对象。
+
+### 5. 删除字典条目
+
+**DELETE /dictionaries/:type/:value**
+
+响应（200）：`{ "deleted": true }`
+
+不存在时返回 404 `entry_not_found`。
+
+### 校验失败响应示例
+
+当新建鸟档案使用了不在字典中的物种时：
+
+```json
+{
+  "status": 400,
+  "error": "dictionary_validation_failed",
+  "message": "字段「species」的值「未知鸟种」不在字典中，请先在字典中添加",
+  "details": [
+    { "valid": false, "type": "species", "value": "未知鸟种", "reason": "not_in_dictionary" }
+  ]
+}
+```
 
 ---
 

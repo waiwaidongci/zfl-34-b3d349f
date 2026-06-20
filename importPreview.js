@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
+import { validateDictionaryValue, validateDictionaryValues } from "./dictionaries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const birdsPath = join(__dirname, "data", "seabirds.json");
@@ -47,8 +48,7 @@ function buildKnownSpeciesSet(existingBirds) {
   return species;
 }
 
-function validateBirds(records, existingBirds) {
-  const knownSpecies = buildKnownSpeciesSet(existingBirds);
+async function validateBirds(records, existingBirds) {
   const existingRingNos = new Set(existingBirds.map(b => b.ringNo));
   const batchRingCounts = new Map();
 
@@ -57,6 +57,7 @@ function validateBirds(records, existingBirds) {
   const duplicateInDb = [];
   const missingMeasurements = [];
   const unknownSpeciesMap = new Map();
+  const dictValidationErrors = [];
 
   for (let i = 0; i < records.length; i++) {
     const rec = records[i];
@@ -76,10 +77,27 @@ function validateBirds(records, existingBirds) {
       errors.push({ field: "species", message: "species 必须为字符串" });
     }
 
-    if (rec.species && !knownSpecies.has(rec.species)) {
-      const arr = unknownSpeciesMap.get(rec.species) || [];
-      arr.push({ index: i, ringNo: rec.ringNo || "(missing)" });
-      unknownSpeciesMap.set(rec.species, arr);
+    if (rec.species) {
+      const speciesCheck = await validateDictionaryValue("species", rec.species, { allowEmpty: false });
+      if (!speciesCheck.valid) {
+        const arr = unknownSpeciesMap.get(rec.species) || [];
+        arr.push({ index: i, ringNo: rec.ringNo || "(missing)" });
+        unknownSpeciesMap.set(rec.species, arr);
+      }
+    }
+
+    if (rec.capturePlace) {
+      const placeCheck = await validateDictionaryValue("capturePlace", rec.capturePlace, { allowEmpty: true });
+      if (!placeCheck.valid) {
+        dictValidationErrors.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "capturePlace", value: rec.capturePlace });
+      }
+    }
+
+    if (rec.season) {
+      const seasonCheck = await validateDictionaryValue("season", rec.season, { allowEmpty: true });
+      if (!seasonCheck.valid) {
+        dictValidationErrors.push({ index: i, ringNo: rec.ringNo || "(missing)", field: "season", value: rec.season });
+      }
     }
 
     if (errors.length > 0) {
@@ -115,18 +133,19 @@ function validateBirds(records, existingBirds) {
       count: records.length,
       records
     })),
-    hasBlockingErrors: fieldErrors.length > 0 || duplicateInDb.length > 0
+    dictValidationErrors,
+    hasBlockingErrors: fieldErrors.length > 0 || duplicateInDb.length > 0 || unknownSpeciesMap.size > 0 || dictValidationErrors.length > 0
   };
 }
 
-function createPreview(records, existingBirds) {
+async function createPreview(records, existingBirds) {
   cleanupCache();
 
   if (!Array.isArray(records) || records.length === 0) {
     throw new Error("invalid_input");
   }
 
-  const validation = validateBirds(records, existingBirds);
+  const validation = await validateBirds(records, existingBirds);
   const previewId = `IMP-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`;
 
   const preview = {
@@ -176,6 +195,18 @@ async function commitImport(previewId) {
     }
     if (!rec.ringNo || !rec.species) {
       skipped.push({ ringNo: rec.ringNo || "(missing)", reason: "missing_required_field" });
+      continue;
+    }
+
+    const speciesCheck = await validateDictionaryValue("species", rec.species, { allowEmpty: false });
+    const placeCheck = await validateDictionaryValue("capturePlace", rec.capturePlace, { allowEmpty: true });
+    const seasonCheck = await validateDictionaryValue("season", rec.season, { allowEmpty: true });
+    if (!speciesCheck.valid || !placeCheck.valid || !seasonCheck.valid) {
+      const invalidFields = [];
+      if (!speciesCheck.valid) invalidFields.push("species");
+      if (!placeCheck.valid) invalidFields.push("capturePlace");
+      if (!seasonCheck.valid) invalidFields.push("season");
+      skipped.push({ ringNo: rec.ringNo || "(missing)", reason: "dictionary_validation_failed", invalidFields });
       continue;
     }
 

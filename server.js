@@ -22,6 +22,17 @@ import {
   persistRiskToBird,
   persistRiskToAllBirds
 } from "./healthRisk.js";
+import {
+  DICTIONARY_TYPES,
+  loadDictionaries,
+  listDictionary,
+  addDictionaryEntry,
+  updateDictionaryEntry,
+  deleteDictionaryEntry,
+  validateDictionaryValue,
+  validateDictionaryValues,
+  mapDictError
+} from "./dictionaries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "seabirds.json");
@@ -71,6 +82,23 @@ function mapSessionError(e) {
   }
 }
 
+function buildDictValidationError(results) {
+  const invalid = results.filter(r => !r.valid);
+  if (invalid.length === 0) return null;
+  const messages = invalid.map(r => {
+    if (r.reason === "empty_value_not_allowed") {
+      return `字段「${r.type}」不能为空`;
+    }
+    return `字段「${r.type}」的值「${r.value}」不在字典中，请先在字典中添加`;
+  });
+  return {
+    status: 400,
+    error: "dictionary_validation_failed",
+    message: messages.join("；"),
+    details: invalid
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -91,7 +119,7 @@ const server = http.createServer(async (req, res) => {
           return send(res, 400, { error: "invalid_input", message: "请求体需包含 records 数组" });
         }
         try {
-          const preview = createPreview(input.records, db.birds);
+          const preview = await createPreview(input.records, db.birds);
           return send(res, 200, {
             previewId: preview.previewId,
             status: preview.status,
@@ -140,6 +168,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/field-sessions")) {
       if (req.method === "POST" && url.pathname === "/field-sessions") {
         const input = await body(req);
+        const sessionValidations = await validateDictionaryValues([
+          { type: "season", value: input.season, allowEmpty: false },
+          { type: "capturePlace", value: input.capturePlace, allowEmpty: false }
+        ]);
+        const sessionDictError = buildDictValidationError(sessionValidations);
+        if (sessionDictError) return send(res, sessionDictError.status, sessionDictError);
         try {
           const session = await createSession(input);
           return send(res, 201, session);
@@ -177,6 +211,14 @@ const server = http.createServer(async (req, res) => {
         }
         if (req.method === "PUT") {
           const input = await body(req);
+          const updateValidations = [];
+          if (input.season !== undefined) updateValidations.push({ type: "season", value: input.season, allowEmpty: false });
+          if (input.capturePlace !== undefined) updateValidations.push({ type: "capturePlace", value: input.capturePlace, allowEmpty: false });
+          if (updateValidations.length > 0) {
+            const updateDictResults = await validateDictionaryValues(updateValidations);
+            const updateDictError = buildDictValidationError(updateDictResults);
+            if (updateDictError) return send(res, updateDictError.status, updateDictError);
+          }
           try {
             const updated = await updateSession(id, input);
             return send(res, 200, updated);
@@ -205,6 +247,71 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname.startsWith("/dictionaries")) {
+      if (req.method === "GET" && url.pathname === "/dictionaries") {
+        const dict = await loadDictionaries();
+        return send(res, 200, {
+          types: DICTIONARY_TYPES,
+          counts: DICTIONARY_TYPES.reduce((acc, t) => {
+          acc[t] = (dict[t] || []).length;
+          return acc;
+        }, {})
+      });
+    }
+
+      const typeMatch = url.pathname.match(/^\/dictionaries\/([^/]+)$/);
+      if (typeMatch) {
+        const type = decodeURIComponent(typeMatch[1]);
+
+        if (req.method === "GET") {
+          const dict = await loadDictionaries();
+          const entries = listDictionary(dict, type);
+          if (entries === null) {
+            return send(res, 400, { error: "invalid_dictionary_type", message: `无效的字典类型，支持: ${DICTIONARY_TYPES.join(", ")}` });
+          }
+          return send(res, 200, entries);
+        }
+
+        if (req.method === "POST") {
+          const input = await body(req);
+          try {
+            const entry = await addDictionaryEntry(type, input.value, input.description);
+            return send(res, 201, entry);
+          } catch (e) {
+            const mapped = mapDictError(e);
+            return send(res, mapped.status, mapped);
+          }
+        }
+      }
+
+      const entryMatch = url.pathname.match(/^\/dictionaries\/([^/]+)\/([^/]+)$/);
+      if (entryMatch) {
+        const type = decodeURIComponent(entryMatch[1]);
+        const value = decodeURIComponent(entryMatch[2]);
+
+        if (req.method === "PUT") {
+          const input = await body(req);
+          try {
+            const entry = await updateDictionaryEntry(type, value, input.value, input.description);
+            return send(res, 200, entry);
+          } catch (e) {
+            const mapped = mapDictError(e);
+            return send(res, mapped.status, mapped);
+          }
+        }
+
+        if (req.method === "DELETE") {
+          try {
+            await deleteDictionaryEntry(type, value);
+            return send(res, 200, { deleted: true });
+          } catch (e) {
+            const mapped = mapDictError(e);
+            return send(res, mapped.status, mapped);
+          }
+        }
+      }
+    }
+
     if (req.method === "GET" && url.pathname === "/") return send(res, 200, {
       service: "海鸟环志站API",
       endpoints: [
@@ -225,7 +332,9 @@ const server = http.createServer(async (req, res) => {
         "POST /field-sessions", "GET /field-sessions",
         "GET /field-sessions/:id", "PUT /field-sessions/:id", "DELETE /field-sessions/:id",
         "GET /field-sessions/summary", "GET /field-sessions/:id/detail",
-        "POST /import/preview", "GET /import/preview/:previewId", "POST /import/commit/:previewId"
+        "POST /import/preview", "GET /import/preview/:previewId", "POST /import/commit/:previewId",
+        "GET /dictionaries", "GET /dictionaries/:type", "POST /dictionaries/:type",
+        "PUT /dictionaries/:type/:value", "DELETE /dictionaries/:type/:value"
       ]
     });
 
@@ -235,6 +344,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/birds") {
       const input = await body(req);
+      const birdValidations = await validateDictionaryValues([
+        { type: "species", value: input.species, allowEmpty: false },
+        { type: "capturePlace", value: input.capturePlace, allowEmpty: true },
+        { type: "season", value: input.season, allowEmpty: true }
+      ]);
+      const birdDictError = buildDictValidationError(birdValidations);
+      if (birdDictError) return send(res, birdDictError.status, birdDictError);
       if (db.birds.some(b => b.ringNo === input.ringNo)) return send(res, 409, { error: "ring_exists" });
       if (await isRingAllocated(input.ringNo)) return send(res, 409, { error: "ring_allocated_in_inventory", message: "该环号在库存中已被占用" });
       const bird = {
@@ -281,6 +397,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "POST" && action !== "history" && action !== "health-risk") {
         const input = await body(req);
+        if ((action === "recaptures" || action === "releases") && input.place) {
+          const placeValidation = await validateDictionaryValue("capturePlace", input.place, { allowEmpty: true });
+          const placeDictError = buildDictValidationError([placeValidation]);
+          if (placeDictError) return send(res, placeDictError.status, placeDictError);
+        }
         bird[action].push({
           at: input.at || (action === "measurements" ? new Date().toISOString().slice(0, 10) : new Date().toISOString()),
           ...input

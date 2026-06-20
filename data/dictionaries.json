@@ -1,0 +1,38 @@
+{
+  "species": [
+    {
+      "value": "黑尾鸥",
+      "description": null,
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z"
+    },
+    {
+      "value": "红嘴鸥",
+      "description": null,
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z"
+    }
+  ],
+  "capturePlace": [
+    {
+      "value": "东礁A区",
+      "description": null,
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z"
+    },
+    {
+      "value": "东礁B区",
+      "description": null,
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z"
+    }
+  ],
+  "season": [
+    {
+      "value": "2026春",
+      "description": null,
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z"
+    }
+  ]
+}
