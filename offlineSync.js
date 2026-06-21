@@ -17,10 +17,18 @@ import {
 import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
 import { validateDictionaryValues } from "./dictionaries.js";
 import { persistRiskToBird } from "./healthRisk.js";
-import { createSession, getSession } from "./fieldSessions.js";
+import { createSession, getSession, updateSession } from "./fieldSessions.js";
 import { randomUUID } from "node:crypto";
 
 const SYNC_TRACKER_FILE = "offlineSyncTracker";
+
+const CONFLICT_STRATEGIES = {
+  SKIP: "skip",
+  OVERWRITE: "overwrite",
+  MERGE: "merge"
+};
+
+const VALID_STRATEGIES = new Set(Object.values(CONFLICT_STRATEGIES));
 
 const syncPacketCache = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -127,11 +135,78 @@ async function validateBirdInput(bird) {
   return errors;
 }
 
+function resolveConflictStrategy(packetStrategy) {
+  if (!packetStrategy) return CONFLICT_STRATEGIES.SKIP;
+  const normalized = String(packetStrategy).toLowerCase().trim();
+  if (VALID_STRATEGIES.has(normalized)) return normalized;
+  return CONFLICT_STRATEGIES.SKIP;
+}
+
+function mergeBirdFields(existing, incoming) {
+  const result = { ...existing };
+  const fields = ["species", "sex", "age", "capturePlace", "season", "fieldSessionId"];
+  for (const f of fields) {
+    if (incoming[f] !== undefined && incoming[f] !== null && incoming[f] !== "") {
+      result[f] = incoming[f];
+    }
+  }
+  return result;
+}
+
+function overwriteBirdFields(existing, incoming) {
+  const result = { ...existing };
+  const fields = ["species", "sex", "age", "capturePlace", "season", "fieldSessionId"];
+  for (const f of fields) {
+    if (incoming[f] !== undefined) {
+      result[f] = incoming[f];
+    }
+  }
+  return result;
+}
+
+function mergeSessionInput(incoming) {
+  const result = {};
+  const fields = ["date", "season", "capturePlace", "team", "weather", "tide", "capturedCount", "releasedCount", "notes"];
+  for (const f of fields) {
+    if (incoming[f] !== undefined && incoming[f] !== null && incoming[f] !== "") {
+      result[f] = incoming[f];
+    }
+  }
+  return result;
+}
+
+function overwriteSessionInput(incoming) {
+  const result = {};
+  const fields = ["date", "season", "capturePlace", "team", "weather", "tide", "capturedCount", "releasedCount", "notes"];
+  for (const f of fields) {
+    if (incoming[f] !== undefined) {
+      result[f] = incoming[f];
+    }
+  }
+  return result;
+}
+
+function mergeEventData(existingData, incomingData) {
+  const result = { ...existingData };
+  for (const [key, value] of Object.entries(incomingData || {})) {
+    if (value !== undefined && value !== null && value !== "") {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function overwriteEventData(incomingData) {
+  return { ...(incomingData || {}) };
+}
+
 async function processOfflinePacket(packet) {
   await initialize();
   cleanupCache();
 
   const packetId = packet.packetId || generateSyncPacketId();
+  const conflictStrategy = resolveConflictStrategy(packet.conflictStrategy);
+
   const cached = isPacketAlreadyProcessed(packetId);
   if (cached) {
     return { ...cached, idempotent: true };
@@ -146,16 +221,23 @@ async function processOfflinePacket(packet) {
 
   const result = {
     packetId,
+    conflictStrategy,
     processedAt: new Date().toISOString(),
     success: {
       birds: 0,
       events: 0,
       sessions: 0
     },
+    conflictResolution: {
+      skipped: 0,
+      overwritten: 0,
+      merged: 0
+    },
     conflicts: [],
     failures: [],
     skipped: [],
-    ringNoConflicts: []
+    ringNoConflicts: [],
+    records: []
   };
 
   const birdsStore = await readBirdsStore();
@@ -163,7 +245,11 @@ async function processOfflinePacket(packet) {
 
   const existingBirdRingNos = new Set(birdsStore.birds.map(b => b.ringNo));
   const existingEventSignatures = new Set(eventsStore.events.map(buildEventSignature));
-  const existingSessionIds = new Set();
+  const existingEventSignatureIndexMap = new Map();
+  for (let idx = 0; idx < eventsStore.events.length; idx++) {
+    const sig = buildEventSignature(eventsStore.events[idx]);
+    existingEventSignatureIndexMap.set(sig, idx);
+  }
 
   const existingEventIndexMap = new Map();
   for (const e of eventsStore.events) {
@@ -184,6 +270,9 @@ async function processOfflinePacket(packet) {
   const packetBirdRingNos = new Set();
 
   const newSessions = [];
+  const overwrittenSessions = [];
+  const mergedSessions = [];
+
   for (let i = 0; i < sessionsInput.length; i++) {
     const session = sessionsInput[i];
     const tempId = session.tempId || `session-${i}`;
@@ -195,6 +284,7 @@ async function processOfflinePacket(packet) {
         tempId,
         reason: "duplicate_in_packet"
       });
+      result.records.push({ type: "session", tempId, action: "skipped", reason: "duplicate_in_packet" });
       continue;
     }
     packetSessionSigs.add(sig);
@@ -202,13 +292,98 @@ async function processOfflinePacket(packet) {
     if (session.id) {
       const existingSession = await getSession(session.id);
       if (existingSession) {
-        result.conflicts.push({
-          type: "session",
-          tempId,
-          sessionId: session.id,
-          reason: "session_already_exists",
-          existing: pickSessionKeyFields(existingSession)
-        });
+        if (conflictStrategy === CONFLICT_STRATEGIES.SKIP) {
+          result.conflicts.push({
+            type: "session",
+            tempId,
+            sessionId: session.id,
+            reason: "session_already_exists",
+            existing: pickSessionKeyFields(existingSession),
+            resolvedBy: "skip"
+          });
+          result.conflictResolution.skipped++;
+          result.records.push({
+            type: "session",
+            tempId,
+            sessionId: session.id,
+            action: "skipped",
+            conflictReason: "session_already_exists"
+          });
+        } else if (conflictStrategy === CONFLICT_STRATEGIES.OVERWRITE) {
+          try {
+            const updateInput = overwriteSessionInput(session);
+            const updated = await updateSession(session.id, updateInput);
+            overwrittenSessions.push({ tempId, session: updated });
+            result.conflicts.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              reason: "session_already_exists",
+              existing: pickSessionKeyFields(existingSession),
+              resolvedBy: "overwrite"
+            });
+            result.conflictResolution.overwritten++;
+            result.success.sessions++;
+            result.records.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              action: "overwritten",
+              conflictReason: "session_already_exists"
+            });
+          } catch (e) {
+            result.failures.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              reason: e.message
+            });
+            result.records.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              action: "failed",
+              reason: e.message
+            });
+          }
+        } else if (conflictStrategy === CONFLICT_STRATEGIES.MERGE) {
+          try {
+            const updateInput = mergeSessionInput(session);
+            const updated = await updateSession(session.id, updateInput);
+            mergedSessions.push({ tempId, session: updated });
+            result.conflicts.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              reason: "session_already_exists",
+              existing: pickSessionKeyFields(existingSession),
+              resolvedBy: "merge"
+            });
+            result.conflictResolution.merged++;
+            result.success.sessions++;
+            result.records.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              action: "merged",
+              conflictReason: "session_already_exists"
+            });
+          } catch (e) {
+            result.failures.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              reason: e.message
+            });
+            result.records.push({
+              type: "session",
+              tempId,
+              sessionId: session.id,
+              action: "failed",
+              reason: e.message
+            });
+          }
+        }
         continue;
       }
     }
@@ -216,8 +391,13 @@ async function processOfflinePacket(packet) {
     try {
       const created = await createSession(session);
       newSessions.push({ tempId, session: created });
-      existingSessionIds.add(created.id);
       result.success.sessions++;
+      result.records.push({
+        type: "session",
+        tempId,
+        sessionId: created.id,
+        action: "created"
+      });
     } catch (e) {
       result.failures.push({
         type: "session",
@@ -225,11 +405,23 @@ async function processOfflinePacket(packet) {
         reason: e.message,
         details: session
       });
+      result.records.push({
+        type: "session",
+        tempId,
+        action: "failed",
+        reason: e.message
+      });
     }
   }
 
   const sessionTempIdMap = new Map();
   for (const s of newSessions) {
+    if (s.tempId) sessionTempIdMap.set(s.tempId, s.session.id);
+  }
+  for (const s of overwrittenSessions) {
+    if (s.tempId) sessionTempIdMap.set(s.tempId, s.session.id);
+  }
+  for (const s of mergedSessions) {
     if (s.tempId) sessionTempIdMap.set(s.tempId, s.session.id);
   }
 
@@ -247,6 +439,7 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: "duplicate_in_packet"
       });
+      result.records.push({ type: "bird", tempId, ringNo: bird.ringNo, action: "skipped", reason: "duplicate_in_packet" });
       continue;
     }
     packetBirdSigs.add(sig);
@@ -267,6 +460,7 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: "ring_duplicate_in_packet"
       });
+      result.records.push({ type: "bird", tempId, ringNo: bird.ringNo, action: "failed", reason: "ring_duplicate_in_packet" });
       continue;
     }
 
@@ -275,17 +469,142 @@ async function processOfflinePacket(packet) {
     }
 
     if (bird.ringNo && existingBirdRingNos.has(bird.ringNo)) {
-      result.ringNoConflicts.push({
-        tempId,
-        ringNo: bird.ringNo,
-        reason: "ring_already_exists_in_db"
-      });
-      result.conflicts.push({
-        type: "bird",
-        tempId,
-        ringNo: bird.ringNo,
-        reason: "ring_already_exists_in_db"
-      });
+      const birdForValidation = { ...bird, fieldSessionId: resolvedFieldSessionId };
+      const validationErrors = await validateBirdInput(birdForValidation);
+
+      if (conflictStrategy === CONFLICT_STRATEGIES.SKIP) {
+        result.ringNoConflicts.push({
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "ring_already_exists_in_db"
+        });
+        result.conflicts.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "ring_already_exists_in_db",
+          resolvedBy: "skip"
+        });
+        result.conflictResolution.skipped++;
+        result.records.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          action: "skipped",
+          conflictReason: "ring_already_exists_in_db"
+        });
+        continue;
+      }
+
+      if (validationErrors.length > 0) {
+        result.ringNoConflicts.push({
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "ring_already_exists_in_db"
+        });
+        result.failures.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "validation_failed",
+          details: validationErrors
+        });
+        result.records.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          action: "failed",
+          reason: "validation_failed_on_conflict_resolution"
+        });
+        continue;
+      }
+
+      const existingIdx = birdsStore.birds.findIndex(b => b.ringNo === bird.ringNo);
+      if (existingIdx === -1) continue;
+
+      const existingBird = birdsStore.birds[existingIdx];
+
+      if (conflictStrategy === CONFLICT_STRATEGIES.OVERWRITE) {
+        const newBird = overwriteBirdFields(existingBird, {
+          species: bird.species,
+          sex: bird.sex || "unknown",
+          age: bird.age || null,
+          capturePlace: bird.capturePlace || null,
+          season: bird.season || null,
+          fieldSessionId: resolvedFieldSessionId
+        });
+        persistRiskToBird(newBird);
+        birdsStore.birds[existingIdx] = newBird;
+        resolvedBirdTempIdMap.set(tempId, bird.ringNo);
+        result.conflicts.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "ring_already_exists_in_db",
+          resolvedBy: "overwrite"
+        });
+        result.conflictResolution.overwritten++;
+        result.success.birds++;
+        result.records.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          action: "overwritten",
+          conflictReason: "ring_already_exists_in_db"
+        });
+      } else if (conflictStrategy === CONFLICT_STRATEGIES.MERGE) {
+        const newBird = mergeBirdFields(existingBird, {
+          species: bird.species,
+          sex: bird.sex,
+          age: bird.age,
+          capturePlace: bird.capturePlace,
+          season: bird.season,
+          fieldSessionId: resolvedFieldSessionId
+        });
+        persistRiskToBird(newBird);
+        birdsStore.birds[existingIdx] = newBird;
+        resolvedBirdTempIdMap.set(tempId, bird.ringNo);
+        result.conflicts.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          reason: "ring_already_exists_in_db",
+          resolvedBy: "merge"
+        });
+        result.conflictResolution.merged++;
+        result.success.birds++;
+        result.records.push({
+          type: "bird",
+          tempId,
+          ringNo: bird.ringNo,
+          action: "merged",
+          conflictReason: "ring_already_exists_in_db"
+        });
+      }
+
+      const birdInlineEventTypes = ["measurements", "releases", "recaptures", "observations"];
+      for (const type of birdInlineEventTypes) {
+        const arr = bird[type] || [];
+        if (Array.isArray(arr)) {
+          for (let j = 0; j < arr.length; j++) {
+            const inlineEvent = {
+              ringNo: bird.ringNo,
+              eventType: type,
+              data: { ...arr[j] }
+            };
+            if (!inlineEvent.data.fieldSessionId && resolvedFieldSessionId) {
+              inlineEvent.data.fieldSessionId = resolvedFieldSessionId;
+            }
+            if (type === "measurements" && !inlineEvent.data.at) {
+              inlineEvent.data.at = new Date().toISOString().slice(0, 10);
+            }
+            if ((type === "releases" || type === "recaptures" || type === "observations") && !inlineEvent.data.at) {
+              inlineEvent.data.at = new Date().toISOString();
+            }
+            eventsInput.push(inlineEvent);
+          }
+        }
+      }
       continue;
     }
 
@@ -301,6 +620,13 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: "ring_allocated_in_inventory"
       });
+      result.records.push({
+        type: "bird",
+        tempId,
+        ringNo: bird.ringNo,
+        action: "failed",
+        reason: "ring_allocated_in_inventory"
+      });
       continue;
     }
 
@@ -313,6 +639,13 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: "validation_failed",
         details: validationErrors
+      });
+      result.records.push({
+        type: "bird",
+        tempId,
+        ringNo: bird.ringNo,
+        action: "failed",
+        reason: "validation_failed"
       });
       continue;
     }
@@ -333,6 +666,12 @@ async function processOfflinePacket(packet) {
       existingBirdRingNos.add(bird.ringNo);
       resolvedBirdTempIdMap.set(tempId, bird.ringNo);
       result.success.birds++;
+      result.records.push({
+        type: "bird",
+        tempId,
+        ringNo: bird.ringNo,
+        action: "created"
+      });
 
       const birdInlineEventTypes = ["measurements", "releases", "recaptures", "observations"];
       for (const type of birdInlineEventTypes) {
@@ -364,6 +703,13 @@ async function processOfflinePacket(packet) {
         ringNo: bird.ringNo,
         reason: e.message
       });
+      result.records.push({
+        type: "bird",
+        tempId,
+        ringNo: bird.ringNo,
+        action: "failed",
+        reason: e.message
+      });
     }
   }
 
@@ -386,6 +732,13 @@ async function processOfflinePacket(packet) {
         eventType: event.eventType,
         reason: "missing_ring_no_or_temp_id_mapping"
       });
+      result.records.push({
+        type: "event",
+        tempId,
+        eventType: event.eventType,
+        action: "failed",
+        reason: "missing_ring_no_or_temp_id_mapping"
+      });
       continue;
     }
 
@@ -395,6 +748,14 @@ async function processOfflinePacket(packet) {
         tempId,
         ringNo: resolvedRingNo,
         eventType: event.eventType,
+        reason: "invalid_event_type"
+      });
+      result.records.push({
+        type: "event",
+        tempId,
+        ringNo: resolvedRingNo,
+        eventType: event.eventType,
+        action: "failed",
         reason: "invalid_event_type"
       });
       continue;
@@ -411,18 +772,134 @@ async function processOfflinePacket(packet) {
         eventType: event.eventType,
         reason: "duplicate_in_packet"
       });
+      result.records.push({
+        type: "event",
+        tempId,
+        ringNo: resolvedRingNo,
+        eventType: event.eventType,
+        action: "skipped",
+        reason: "duplicate_in_packet"
+      });
       continue;
     }
     packetEventSigs.add(sig);
 
     if (existingEventSignatures.has(sig)) {
-      result.skipped.push({
-        type: "event",
-        tempId,
-        ringNo: resolvedRingNo,
-        eventType: event.eventType,
-        reason: "already_exists_in_db"
-      });
+      if (conflictStrategy === CONFLICT_STRATEGIES.SKIP) {
+        result.skipped.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db"
+        });
+        result.conflicts.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db",
+          resolvedBy: "skip"
+        });
+        result.conflictResolution.skipped++;
+        result.records.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          action: "skipped",
+          conflictReason: "already_exists_in_db"
+        });
+        continue;
+      }
+
+      const existingIdx = existingEventSignatureIndexMap.get(sig);
+      if (existingIdx === undefined || existingIdx === null) {
+        result.skipped.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db"
+        });
+        result.conflicts.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db",
+          resolvedBy: "skip"
+        });
+        result.records.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          action: "skipped",
+          conflictReason: "already_exists_in_db"
+        });
+        continue;
+      }
+
+      const existingEvent = eventsStore.events[existingIdx];
+      const resolvedFieldSessionId = event.data && event.data.fieldSessionId
+        ? (sessionTempIdMap.get(event.data.fieldSessionId) || event.data.fieldSessionId)
+        : null;
+
+      let newData;
+      if (conflictStrategy === CONFLICT_STRATEGIES.OVERWRITE) {
+        newData = overwriteEventData(event.data || {});
+        result.conflicts.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db",
+          resolvedBy: "overwrite"
+        });
+        result.conflictResolution.overwritten++;
+        result.records.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          action: "overwritten",
+          conflictReason: "already_exists_in_db"
+        });
+      } else {
+        newData = mergeEventData(existingEvent.data || {}, event.data || {});
+        result.conflicts.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          reason: "already_exists_in_db",
+          resolvedBy: "merge"
+        });
+        result.conflictResolution.merged++;
+        result.records.push({
+          type: "event",
+          tempId,
+          ringNo: resolvedRingNo,
+          eventType: event.eventType,
+          action: "merged",
+          conflictReason: "already_exists_in_db"
+        });
+      }
+
+      if (resolvedFieldSessionId) newData.fieldSessionId = resolvedFieldSessionId;
+      if (event.eventType === "measurements" && !newData.at) {
+        newData.at = new Date().toISOString().slice(0, 10);
+      }
+      if ((event.eventType === "releases" || event.eventType === "recaptures" || event.eventType === "observations") && !newData.at) {
+        newData.at = new Date().toISOString();
+      }
+
+      eventsStore.events[existingIdx] = {
+        ...existingEvent,
+        data: newData
+      };
+      result.success.events++;
       continue;
     }
 
@@ -453,13 +930,29 @@ async function processOfflinePacket(packet) {
         data: eventData
       });
       existingEventSignatures.add(sig);
+      existingEventSignatureIndexMap.set(sig, eventsStore.events.length - 1);
       result.success.events++;
+      result.records.push({
+        type: "event",
+        tempId,
+        ringNo: resolvedRingNo,
+        eventType: event.eventType,
+        action: "created"
+      });
     } catch (e) {
       result.failures.push({
         type: "event",
         tempId,
         ringNo: resolvedRingNo,
         eventType: event.eventType,
+        reason: e.message
+      });
+      result.records.push({
+        type: "event",
+        tempId,
+        ringNo: resolvedRingNo,
+        eventType: event.eventType,
+        action: "failed",
         reason: e.message
       });
     }
@@ -477,16 +970,29 @@ async function processOfflinePacket(packet) {
     }
   }
 
-  const hasErrors = result.failures.length > 0 || result.conflicts.length > 0;
+  const unresolvedConflicts = result.conflicts.filter(c => c.resolvedBy === "skip" || !c.resolvedBy);
+  const hasErrors = result.failures.length > 0 || unresolvedConflicts.length > 0;
   result.status = hasErrors ? "partial_success" : "success";
 
-  const createdBirds = [];
+  const createdOrUpdatedBirds = [];
   for (const [tempId, ringNo] of resolvedBirdTempIdMap.entries()) {
     const bird = birdsStore.birds.find(b => b.ringNo === ringNo);
     if (bird) {
-      createdBirds.push({ tempId, ringNo, bird: pickBirdKeyFields(bird) });
+      const record = result.records.find(r => r.type === "bird" && r.ringNo === ringNo && r.tempId === tempId);
+      createdOrUpdatedBirds.push({
+        tempId,
+        ringNo,
+        action: record ? record.action : "created",
+        bird: pickBirdKeyFields(bird)
+      });
     }
   }
+
+  const allProcessedSessions = [
+    ...newSessions.map(s => ({ ...s, action: "created" })),
+    ...overwrittenSessions.map(s => ({ ...s, action: "overwritten" })),
+    ...mergedSessions.map(s => ({ ...s, action: "merged" }))
+  ];
 
   recordAuditLog({
     operationType: OPERATION_TYPES.OFFLINE_SYNC_PACKET,
@@ -494,13 +1000,29 @@ async function processOfflinePacket(packet) {
     targetId: packetId,
     requestSummary: {
       packetId,
+      conflictStrategy,
       inputCounts: {
         sessions: sessionsInput.length,
         birds: birdsInput.length,
         events: eventsInput.length
       },
       success: result.success,
+      conflictResolution: result.conflictResolution,
       conflictsCount: result.conflicts.length,
+      conflictSummary: {
+        total: result.conflicts.length,
+        byType: {
+          bird: result.conflicts.filter(c => c.type === "bird").length,
+          session: result.conflicts.filter(c => c.type === "session").length,
+          event: result.conflicts.filter(c => c.type === "event").length
+        },
+        byResolution: {
+          skipped: result.conflicts.filter(c => c.resolvedBy === "skip").length,
+          overwritten: result.conflicts.filter(c => c.resolvedBy === "overwrite").length,
+          merged: result.conflicts.filter(c => c.resolvedBy === "merge").length,
+          unresolved: result.conflicts.filter(c => !c.resolvedBy).length
+        }
+      },
       failuresCount: result.failures.length,
       skippedCount: result.skipped.length,
       ringNoConflictCount: result.ringNoConflicts.length,
@@ -508,8 +1030,12 @@ async function processOfflinePacket(packet) {
     },
     before: null,
     after: {
-      createdSessions: newSessions.map(s => pickSessionKeyFields(s.session)),
-      createdBirds,
+      processedSessions: allProcessedSessions.map(s => ({
+        action: s.action,
+        tempId: s.tempId,
+        ...pickSessionKeyFields(s.session)
+      })),
+      createdOrUpdatedBirds,
       ringNoConflicts: result.ringNoConflicts
     }
   });
@@ -529,5 +1055,7 @@ async function processOfflinePacket(packet) {
 }
 
 export {
+  CONFLICT_STRATEGIES,
+  resolveConflictStrategy,
   processOfflinePacket
 };

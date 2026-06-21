@@ -12,11 +12,11 @@
       ],
       "weather": "晴，风力3级",
       "tide": "高潮 08:20，潮高2.1m",
-      "capturedCount": 15,
-      "releasedCount": 15,
-      "notes": "鸟群活跃度高，无异常情况",
+      "capturedCount": 200,
+      "releasedCount": 100,
+      "notes": "合并的备注",
       "createdAt": "2026-05-03T10:00:00.000Z",
-      "updatedAt": "2026-05-03T18:00:00.000Z"
+      "updatedAt": "2026-06-21T03:01:18.567Z"
     },
     {
       "id": "FS-2026-0611-001",

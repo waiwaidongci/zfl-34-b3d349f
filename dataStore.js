@@ -175,6 +175,8 @@ async function ensureDataDir() {
   }
 }
 
+const inFlightTempPaths = new Set();
+
 async function cleanupOrphanTempFiles() {
   try {
     const tempPattern = join(DATA_DIR, "*.tmp.*");
@@ -182,14 +184,15 @@ async function cleanupOrphanTempFiles() {
     for await (const entry of glob(tempPattern)) {
       tempFiles.push(entry);
     }
-    for (const f of tempFiles) {
+    const toDelete = tempFiles.filter(f => !inFlightTempPaths.has(f));
+    for (const f of toDelete) {
       try {
         await unlink(f);
         console.log(`[dataStore] 清理孤儿临时文件: ${f.split("/").pop()}`);
       } catch (_) {}
     }
-    if (tempFiles.length > 0) {
-      console.log(`[dataStore] 共清理 ${tempFiles.length} 个孤儿临时文件`);
+    if (toDelete.length > 0) {
+      console.log(`[dataStore] 共清理 ${toDelete.length} 个孤儿临时文件`);
     }
   } catch (_) {}
 }
@@ -200,10 +203,15 @@ function generateTempPath(filePath) {
 
 async function atomicWriteFile(filePath, data) {
   const tempPath = generateTempPath(filePath);
-  const jsonStr = JSON.stringify(data, null, 2);
-  await ensureDataDir();
-  await writeFile(tempPath, jsonStr, "utf8");
-  await rename(tempPath, filePath);
+  inFlightTempPaths.add(tempPath);
+  try {
+    const jsonStr = JSON.stringify(data, null, 2);
+    await ensureDataDir();
+    await writeFile(tempPath, jsonStr, "utf8");
+    await rename(tempPath, filePath);
+  } finally {
+    inFlightTempPaths.delete(tempPath);
+  }
 }
 
 async function atomicWriteMulti(fileMap) {
@@ -211,6 +219,7 @@ async function atomicWriteMulti(fileMap) {
     ? fileMap.map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath), backupPath: `${filePath}.bak.${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
     : Object.entries(fileMap).map(([filePath, data]) => ({ filePath, data, tempPath: generateTempPath(filePath), backupPath: `${filePath}.bak.${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }));
 
+  for (const entry of entries) inFlightTempPaths.add(entry.tempPath);
   await ensureDataDir();
 
   const changed = [];
@@ -260,6 +269,8 @@ async function atomicWriteMulti(fileMap) {
       } catch (_) {}
     }
     throw e;
+  } finally {
+    for (const entry of entries) inFlightTempPaths.delete(entry.tempPath);
   }
 }
 
