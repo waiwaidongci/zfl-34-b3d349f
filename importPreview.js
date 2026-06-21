@@ -305,7 +305,7 @@ async function commitImport(previewId) {
 
   for (const bird of imported) {
     try {
-      await syncAllocateRing(bird.ringNo, bird.ringNo);
+      await syncAllocateRing(bird.ringNo, bird.ringNo, { fieldSessionId: bird.fieldSessionId || null });
     } catch (_) {}
   }
 

@@ -117,7 +117,17 @@ export async function listBatches({ season } = {}) {
 export async function listRings({ status, batchId, ringNo } = {}) {
   const inventory = await loadInventory();
   let rings = inventory.rings;
-  if (status) rings = rings.filter(r => r.status === status);
+  if (status) {
+    rings = rings.filter(r => {
+      if (status === "available") {
+        return r.status === "available" || (r.status === "reserved" && isRingReservationExpired(r));
+      }
+      if (status === "reserved") {
+        return r.status === "reserved" && !isRingReservationExpired(r);
+      }
+      return r.status === status;
+    });
+  }
   if (batchId) rings = rings.filter(r => r.batchId === batchId);
   if (ringNo) rings = rings.filter(r => r.ringNo === ringNo);
   return rings;
@@ -125,7 +135,9 @@ export async function listRings({ status, batchId, ringNo } = {}) {
 
 export async function getNextAvailableRing(batchId) {
   const inventory = await loadInventory();
-  let rings = inventory.rings.filter(r => r.status === "available");
+  let rings = inventory.rings.filter(r =>
+    r.status === "available" || (r.status === "reserved" && isRingReservationExpired(r))
+  );
   if (batchId) rings = rings.filter(r => r.batchId === batchId);
   return rings.sort((a, b) => a.ringNo.localeCompare(b.ringNo))[0] || null;
 }
@@ -232,7 +244,7 @@ export async function allocateNextAvailable({ batchId, allocatedTo, season }) {
   return await allocateRing({ ringNo: nextRing.ringNo, allocatedTo, season });
 }
 
-export async function syncAllocateRing(ringNo, allocatedTo) {
+export async function syncAllocateRing(ringNo, allocatedTo, { fieldSessionId } = {}) {
   const inventory = await loadInventory();
   const ring = inventory.rings.find(r => r.ringNo === ringNo);
   if (!ring) return null;
@@ -244,6 +256,14 @@ export async function syncAllocateRing(ringNo, allocatedTo) {
     ring.reservedBy = null;
     ring.reservedAt = null;
     ring.reservedExpiresAt = null;
+  }
+  if (ring.status === "reserved") {
+    if (!fieldSessionId) {
+      throw new Error("ring_reserved");
+    }
+    if (ring.reservedBy !== fieldSessionId) {
+      throw new Error("ring_reserved_by_other_session");
+    }
   }
   const beforeRing = pickRingKeyFields(ring);
   ring.status = "allocated";
@@ -257,7 +277,7 @@ export async function syncAllocateRing(ringNo, allocatedTo) {
     operationType: OPERATION_TYPES.RING_ALLOCATE,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
-    requestSummary: { ringNo, allocatedTo: allocatedTo || ringNo, sync: true },
+    requestSummary: { ringNo, allocatedTo: allocatedTo || ringNo, sync: true, fieldSessionId },
     before: beforeRing,
     after: pickRingKeyFields(ring)
   });
@@ -335,6 +355,7 @@ export async function cancelReservation(ringNo) {
   }
 
   const beforeRing = pickRingKeyFields(ring);
+  const wasExpired = isRingReservationExpired(ring);
   ring.status = "available";
   ring.reservedBy = null;
   ring.reservedAt = null;
@@ -345,7 +366,7 @@ export async function cancelReservation(ringNo) {
     operationType: OPERATION_TYPES.RING_CANCEL_RESERVATION,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
-    requestSummary: { ringNo },
+    requestSummary: { ringNo, wasExpired },
     before: beforeRing,
     after: pickRingKeyFields(ring)
   });

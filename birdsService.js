@@ -134,8 +134,10 @@ export async function createBird(input) {
   await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
   try {
-    await syncAllocateRing(input.ringNo, input.ringNo);
-  } catch (_) {}
+    await syncAllocateRing(input.ringNo, input.ringNo, { fieldSessionId: input.fieldSessionId });
+  } catch (syncErr) {
+    console.error(`[birdsService] syncAllocateRing failed for ${input.ringNo}: ${syncErr.message}`);
+  }
 
   recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_CREATE,

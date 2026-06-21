@@ -45,9 +45,9 @@
     {
       "ringNo": "SB-27000",
       "batchId": "BATCH-2026春-MQMMTF9Y",
-      "status": "available",
-      "allocatedTo": null,
-      "allocatedAt": null,
+      "status": "allocated",
+      "allocatedTo": "SB-27000",
+      "allocatedAt": "2026-06-21T02:11:33.611Z",
       "reservedBy": null,
       "reservedAt": null,
       "reservedExpiresAt": null
@@ -55,9 +55,9 @@
     {
       "ringNo": "SB-27001",
       "batchId": "BATCH-2026春-MQMMTF9Y",
-      "status": "available",
-      "allocatedTo": null,
-      "allocatedAt": null,
+      "status": "allocated",
+      "allocatedTo": "SB-27001",
+      "allocatedAt": "2026-06-21T02:13:18.003Z",
       "reservedBy": null,
       "reservedAt": null,
       "reservedExpiresAt": null
