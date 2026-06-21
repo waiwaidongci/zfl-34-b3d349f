@@ -144,7 +144,8 @@ export async function recordAuditLog({
   targetId,
   requestSummary = null,
   before = null,
-  after = null
+  after = null,
+  levelChanges
 }) {
   try {
     const logEntry = {
@@ -157,6 +158,9 @@ export async function recordAuditLog({
       before,
       after
     };
+    if (levelChanges !== undefined) {
+      logEntry.levelChanges = levelChanges;
+    }
 
     const data = await loadAuditLogs();
     data.logs.push(logEntry);
