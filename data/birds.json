@@ -262,6 +262,69 @@
         "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
+    },
+    {
+      "ringNo": "SB-TEST-001",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": null,
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": {
+        "ringNo": "SB-TEST-001",
+        "species": "黑尾鸥",
+        "level": "medium",
+        "score": 30,
+        "factors": [
+          {
+            "type": "missing_measurements",
+            "description": "最新测量缺少关键字段：bill(喙长)",
+            "severity": "medium",
+            "missingFields": [
+              "bill(喙长)"
+            ]
+          }
+        ],
+        "calculatedAt": "2026-06-21T05:35:49.976Z",
+        "latestMeasurement": {
+          "at": "2026-06-21",
+          "wing": 320,
+          "weight": 500,
+          "fieldSessionId": "FS-2026-0503-001"
+        }
+      }
+    },
+    {
+      "ringNo": "SB-TEST-002",
+      "species": "黑尾鸥",
+      "sex": "unknown",
+      "age": null,
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": null,
+      "healthRisk": {
+        "ringNo": "SB-TEST-002",
+        "species": "黑尾鸥",
+        "level": "medium",
+        "score": 30,
+        "factors": [
+          {
+            "type": "missing_measurements",
+            "description": "最新测量缺少关键字段：bill(喙长)",
+            "severity": "medium",
+            "missingFields": [
+              "bill(喙长)"
+            ]
+          }
+        ],
+        "calculatedAt": "2026-06-21T05:36:03.695Z",
+        "latestMeasurement": {
+          "at": "2026-06-21",
+          "wing": 315,
+          "weight": 480
+        }
+      }
     }
   ]
 }

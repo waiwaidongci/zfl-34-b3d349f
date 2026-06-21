@@ -1,0 +1,85 @@
+{
+  "taskId": "IMP-MQNCS4MA-6f66a9",
+  "createdAt": 1782020140643,
+  "records": [
+    {
+      "ringNo": "SB-TEST-001",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "measurements": [
+        {
+          "at": "2026-06-21",
+          "wing": 320,
+          "weight": 500
+        }
+      ]
+    },
+    {
+      "ringNo": "SB-TEST-002",
+      "species": "黑尾鸥",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "measurements": [
+        {
+          "at": "2026-06-21",
+          "wing": 315,
+          "weight": 480
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "totalRecords": 2,
+    "validRecords": 2,
+    "fieldErrors": [],
+    "duplicateInBatch": [],
+    "duplicateInDb": [],
+    "missingMeasurements": [],
+    "unknownSpecies": [],
+    "dictValidationWarnings": [],
+    "fieldSessionWarnings": [],
+    "fieldSessionValidationSummary": {
+      "totalRecords": 2,
+      "recordsWithFieldSession": 1,
+      "recordsWithoutFieldSession": 1,
+      "sessionNotFoundCount": 0,
+      "sessionMismatchCount": 0
+    },
+    "hasBlockingErrors": false
+  },
+  "status": "committed",
+  "commitState": {
+    "processedCount": 2,
+    "successCount": 2,
+    "skippedCount": 0,
+    "failedCount": 0,
+    "processedRingNos": [
+      "SB-TEST-001",
+      "SB-TEST-002"
+    ],
+    "perRecordStatus": [
+      {
+        "index": 0,
+        "ringNo": "SB-TEST-001",
+        "status": "success"
+      },
+      {
+        "index": 1,
+        "ringNo": "SB-TEST-002",
+        "status": "success"
+      }
+    ],
+    "importedRingNos": [
+      "SB-TEST-001",
+      "SB-TEST-002"
+    ],
+    "skippedDetails": [],
+    "failedDetails": [],
+    "startedAt": "2026-06-21T05:35:49.973Z",
+    "lastBatchAt": "2026-06-21T05:36:03.698Z",
+    "committedAt": "2026-06-21T05:36:03.698Z"
+  }
+}

@@ -1962,6 +1962,65 @@
       },
       "before": null,
       "after": null
+    },
+    {
+      "id": "LOG-MQNCSMET-df258c91",
+      "timestamp": "2026-06-21T05:36:03.701Z",
+      "operationType": "bird_batch_import",
+      "targetType": "bird",
+      "targetId": "IMP-MQNCS4MA-6f66a9",
+      "requestSummary": {
+        "previewId": "IMP-MQNCS4MA-6f66a9",
+        "taskId": "IMP-MQNCS4MA-6f66a9",
+        "importedCount": 2,
+        "skippedCount": 0,
+        "failedCount": 0,
+        "importedRingNos": [
+          "SB-TEST-001",
+          "SB-TEST-002"
+        ],
+        "skippedDetails": [],
+        "failedDetails": [],
+        "fieldSessionValidation": {
+          "totalRecords": 2,
+          "recordsWithFieldSession": 1,
+          "recordsWithoutFieldSession": 1,
+          "sessionNotFoundCount": 0,
+          "sessionMismatchCount": 0,
+          "warnings": []
+        }
+      },
+      "before": null,
+      "after": [
+        {
+          "ringNo": "SB-TEST-001",
+          "species": "黑尾鸥",
+          "sex": "male",
+          "age": null,
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": "FS-2026-0503-001",
+          "measurementsCount": 1,
+          "recapturesCount": 0,
+          "observationsCount": 0,
+          "releasesCount": 0,
+          "healthRiskLevel": "medium"
+        },
+        {
+          "ringNo": "SB-TEST-002",
+          "species": "黑尾鸥",
+          "sex": "unknown",
+          "age": null,
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": null,
+          "measurementsCount": 1,
+          "recapturesCount": 0,
+          "observationsCount": 0,
+          "releasesCount": 0,
+          "healthRiskLevel": "medium"
+        }
+      ]
     }
   ]
 }

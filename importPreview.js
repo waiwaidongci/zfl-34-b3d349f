@@ -1,3 +1,8 @@
+import { mkdir, readFile, unlink, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import {
   initialize,
   loadLegacyCompatibleDb,
@@ -5,18 +10,24 @@ import {
   readEventsStore,
   readStore,
   writeBirdsAndEventsStore,
-  reassembleBirdFromEvents
+  reassembleBirdFromEvents,
+  atomicWriteFile,
+  atomicWriteMulti,
+  STORE_FILES
 } from "./dataStore.js";
-import { randomUUID } from "node:crypto";
 import { getRingStatus, syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
-import { validateDictionaryValue, validateDictionaryValues } from "./dictionaries.js";
+import { validateDictionaryValue } from "./dictionaries.js";
 import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
   pickBirdKeyFields
 } from "./auditLog.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const IMPORTS_DIR = join(__dirname, "data", "imports");
+const INDEX_PATH = join(IMPORTS_DIR, "index.json");
 
 const KNOWN_SPECIES = new Set([
   "黑尾鸥", "黑嘴鸥", "遗鸥", "红嘴鸥", "普通燕鸥",
@@ -25,18 +36,138 @@ const KNOWN_SPECIES = new Set([
 ]);
 
 const REQUIRED_FIELDS = ["ringNo", "species"];
+const TASK_TTL_MS = 24 * 60 * 60 * 1000;
+const BATCH_SIZE = 50;
 
-const PREVIEW_TTL_MS = 30 * 60 * 1000;
+const TASK_STATUS = {
+  READY: "ready",
+  BLOCKED: "blocked",
+  COMMITTING: "committing",
+  PARTIAL: "partial",
+  COMMITTED: "committed",
+  EXPIRED: "expired"
+};
 
-const previewCache = new Map();
+async function ensureImportsDir() {
+  if (!existsSync(IMPORTS_DIR)) {
+    await mkdir(IMPORTS_DIR, { recursive: true });
+  }
+}
 
-function cleanupCache() {
+function generateTaskId() {
+  return `IMP-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`;
+}
+
+function taskFilePath(taskId) {
+  return join(IMPORTS_DIR, `${taskId}.json`);
+}
+
+async function loadIndex() {
+  await ensureImportsDir();
+  if (!existsSync(INDEX_PATH)) {
+    const defaultIndex = { tasks: [] };
+    await atomicWriteFile(INDEX_PATH, defaultIndex);
+    return defaultIndex;
+  }
+  try {
+    return JSON.parse(await readFile(INDEX_PATH, "utf8"));
+  } catch {
+    return { tasks: [] };
+  }
+}
+
+async function saveIndex(index) {
+  await ensureImportsDir();
+  await atomicWriteFile(INDEX_PATH, index);
+}
+
+async function cleanupExpired() {
   const now = Date.now();
-  for (const [id, entry] of previewCache) {
-    if (now - entry.createdAt > PREVIEW_TTL_MS) {
-      previewCache.delete(id);
+  const index = await loadIndex();
+  const toDelete = [];
+  const remaining = [];
+  for (const entry of index.tasks) {
+    if (entry.status !== TASK_STATUS.COMMITTED && now - entry.createdAt > TASK_TTL_MS) {
+      toDelete.push(entry.taskId);
+    } else {
+      remaining.push(entry);
     }
   }
+  if (toDelete.length > 0) {
+    for (const taskId of toDelete) {
+      try {
+        const fp = taskFilePath(taskId);
+        if (existsSync(fp)) await unlink(fp);
+      } catch (_) {}
+    }
+    index.tasks = remaining;
+    await saveIndex(index);
+  }
+  return toDelete;
+}
+
+function isTaskExpired(task) {
+  if (!task) return true;
+  if (task.status === TASK_STATUS.COMMITTED) return false;
+  return Date.now() - task.createdAt > TASK_TTL_MS;
+}
+
+async function loadTask(taskId) {
+  await cleanupExpired();
+  const fp = taskFilePath(taskId);
+  if (!existsSync(fp)) return null;
+  try {
+    const task = JSON.parse(await readFile(fp, "utf8"));
+    if (isTaskExpired(task)) {
+      task.status = TASK_STATUS.EXPIRED;
+      await saveTask(task);
+      const idx = await loadIndex();
+      const entry = idx.tasks.find(t => t.taskId === taskId);
+      if (entry) {
+        entry.status = TASK_STATUS.EXPIRED;
+        await saveIndex(idx);
+      }
+      return task;
+    }
+    return task;
+  } catch {
+    return null;
+  }
+}
+
+async function saveTask(task) {
+  await ensureImportsDir();
+  const fp = taskFilePath(task.taskId);
+  await atomicWriteFile(fp, task);
+  const index = await loadIndex();
+  const existingIdx = index.tasks.findIndex(t => t.taskId === task.taskId);
+  const summaryEntry = {
+    taskId: task.taskId,
+    createdAt: task.createdAt,
+    expiresAt: task.createdAt + TASK_TTL_MS,
+    status: task.status,
+    totalRecords: task.records.length,
+    validation: {
+      hasBlockingErrors: task.validation?.hasBlockingErrors || false,
+      validRecords: task.validation?.validRecords || 0,
+      fieldErrors: task.validation?.fieldErrors?.length || 0,
+      duplicateInDb: task.validation?.duplicateInDb?.length || 0
+    },
+    commitProgress: task.commitState ? {
+      processed: task.commitState.processedCount || 0,
+      committed: task.commitState.successCount || 0,
+      skipped: task.commitState.skippedCount || 0,
+      failed: task.commitState.failedCount || 0,
+      total: task.records.length
+    } : null,
+    committedAt: task.commitState?.committedAt || null
+  };
+  if (existingIdx >= 0) {
+    index.tasks[existingIdx] = summaryEntry;
+  } else {
+    index.tasks.unshift(summaryEntry);
+  }
+  await saveIndex(index);
 }
 
 async function loadBirds() {
@@ -192,8 +323,29 @@ async function loadFieldSessions() {
   return store.fieldSessions || [];
 }
 
+function buildInitialCommitState(records) {
+  return {
+    processedCount: 0,
+    successCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
+    processedRingNos: [],
+    perRecordStatus: records.map((rec, i) => ({
+      index: i,
+      ringNo: rec.ringNo || null,
+      status: "pending"
+    })),
+    importedRingNos: [],
+    skippedDetails: [],
+    failedDetails: [],
+    startedAt: null,
+    lastBatchAt: null,
+    committedAt: null
+  };
+}
+
 async function createPreview(records, existingBirds) {
-  cleanupCache();
+  await cleanupExpired();
 
   if (!Array.isArray(records) || records.length === 0) {
     throw new Error("invalid_input");
@@ -201,159 +353,299 @@ async function createPreview(records, existingBirds) {
 
   const fieldSessions = await loadFieldSessions();
   const validation = await validateBirds(records, existingBirds, fieldSessions);
-  const previewId = `IMP-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`;
+  const taskId = generateTaskId();
 
-  const preview = {
-    previewId,
+  const task = {
+    taskId,
     createdAt: Date.now(),
     records,
     validation,
-    status: validation.hasBlockingErrors ? "blocked" : "ready"
+    status: validation.hasBlockingErrors ? TASK_STATUS.BLOCKED : TASK_STATUS.READY,
+    commitState: buildInitialCommitState(records)
   };
 
-  previewCache.set(previewId, preview);
-  return preview;
+  await saveTask(task);
+  return task;
 }
 
-function getPreview(previewId) {
-  cleanupCache();
-  const entry = previewCache.get(previewId);
-  if (!entry) return null;
-  if (Date.now() - entry.createdAt > PREVIEW_TTL_MS) {
-    previewCache.delete(previewId);
-    return null;
+async function getPreview(taskId) {
+  const task = await loadTask(taskId);
+  if (!task) return null;
+  return task;
+}
+
+async function listTasks() {
+  await cleanupExpired();
+  const index = await loadIndex();
+  return index.tasks;
+}
+
+function getNextPendingIndices(task, batchSize = BATCH_SIZE) {
+  const pending = [];
+  for (const rs of task.commitState.perRecordStatus) {
+    if (rs.status === "pending") {
+      pending.push(rs.index);
+      if (pending.length >= batchSize) break;
+    }
   }
-  return entry;
+  return pending;
 }
 
-async function commitImport(previewId) {
+function buildBirdAndEvents(rec) {
+  const bird = {
+    ringNo: rec.ringNo,
+    species: rec.species,
+    sex: rec.sex || "unknown",
+    age: rec.age || null,
+    capturePlace: rec.capturePlace || null,
+    season: rec.season || null,
+    fieldSessionId: rec.fieldSessionId || null
+  };
+
+  const birdEvents = [];
+  const eventTypes = ["measurements", "releases", "recaptures", "observations"];
+  for (const type of eventTypes) {
+    const arr = (type === "recaptures" || type === "observations")
+      ? []
+      : (rec[type] || []);
+    for (let i = 0; i < arr.length; i++) {
+      const entry = { ...arr[i] };
+      if (type === "measurements" && !entry.at) entry.at = new Date().toISOString().slice(0, 10);
+      if (type === "releases" && !entry.at) entry.at = new Date().toISOString();
+      if (!entry.fieldSessionId && rec.fieldSessionId) entry.fieldSessionId = rec.fieldSessionId;
+      birdEvents.push({
+        ringNo: rec.ringNo,
+        eventType: type,
+        eventIndex: i,
+        data: entry
+      });
+    }
+  }
+
+  return { bird, birdEvents };
+}
+
+async function commitImport(taskId, options = {}) {
+  const { batchSize = BATCH_SIZE } = options;
   await initialize();
-  const preview = getPreview(previewId);
-  if (!preview) {
+
+  const task = await loadTask(taskId);
+  if (!task) {
     throw new Error("preview_not_found");
   }
-  if (preview.status === "committed") {
-    throw new Error("already_committed");
+  if (task.status === TASK_STATUS.EXPIRED) {
+    throw new Error("task_expired");
   }
-  if (preview.validation.hasBlockingErrors) {
+  if (task.status === TASK_STATUS.COMMITTED) {
+    return {
+      taskId,
+      imported: task.commitState.successCount,
+      skipped: task.commitState.skippedCount,
+      failed: task.commitState.failedCount,
+      skippedDetails: task.commitState.skippedDetails,
+      failedDetails: task.commitState.failedDetails,
+      completed: true,
+      alreadyCommitted: true
+    };
+  }
+  if (task.validation.hasBlockingErrors) {
     throw new Error("has_blocking_errors");
   }
 
-  const birdsStore = await readBirdsStore();
-  const eventsStore = await readEventsStore();
-  const existingRingNos = new Set(birdsStore.birds.map(b => b.ringNo));
-  const imported = [];
-  const skipped = [];
+  const previousStatus = task.status;
+  task.status = TASK_STATUS.COMMITTING;
+  if (!task.commitState.startedAt) {
+    task.commitState.startedAt = new Date().toISOString();
+  }
+  await saveTask(task);
 
-  for (const rec of preview.records) {
-    if (existingRingNos.has(rec.ringNo)) {
-      skipped.push({ ringNo: rec.ringNo, reason: "duplicate_in_db" });
-      continue;
+  try {
+    const birdsStore = await readBirdsStore();
+    const eventsStore = await readEventsStore();
+    const existingRingNos = new Set(birdsStore.birds.map(b => b.ringNo));
+    const processedRingNos = new Set(task.commitState.processedRingNos);
+    const batchIndices = getNextPendingIndices(task, batchSize);
+
+    if (batchIndices.length === 0) {
+      task.status = task.commitState.failedCount > 0 ? TASK_STATUS.PARTIAL : TASK_STATUS.COMMITTED;
+      task.commitState.committedAt = new Date().toISOString();
+      await saveTask(task);
+      await recordAuditLogForTask(task);
+      return buildCommitResult(task, true);
     }
-    if (!rec.ringNo || !rec.species) {
-      skipped.push({ ringNo: rec.ringNo || "(missing)", reason: "missing_required_field" });
-      continue;
-    }
 
-    const speciesCheck = await validateDictionaryValue("species", rec.species, { allowEmpty: false });
-    if (!speciesCheck.valid) {
-      skipped.push({ ringNo: rec.ringNo, reason: "dictionary_validation_failed", invalidFields: ["species"] });
-      continue;
-    }
+    for (const idx of batchIndices) {
+      const rec = task.records[idx];
+      const rs = task.commitState.perRecordStatus[idx];
 
-    const bird = {
-      ringNo: rec.ringNo,
-      species: rec.species,
-      sex: rec.sex || "unknown",
-      age: rec.age || null,
-      capturePlace: rec.capturePlace || null,
-      season: rec.season || null,
-      fieldSessionId: rec.fieldSessionId || null
-    };
+      if (rec.ringNo && processedRingNos.has(rec.ringNo)) {
+        rs.status = "skipped";
+        rs.error = "duplicate_in_batch_processed";
+        task.commitState.skippedCount++;
+        task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "duplicate_in_batch_processed" });
+        continue;
+      }
 
-    const birdEvents = [];
-    const eventTypes = ["measurements", "releases", "recaptures", "observations"];
-    for (const type of eventTypes) {
-      const arr = (type === "recaptures" || type === "observations")
-        ? []
-        : (rec[type] || []);
-      for (let i = 0; i < arr.length; i++) {
-        const entry = { ...arr[i] };
-        if (type === "measurements" && !entry.at) entry.at = new Date().toISOString().slice(0, 10);
-        if (type === "releases" && !entry.at) entry.at = new Date().toISOString();
-        if (!entry.fieldSessionId && rec.fieldSessionId) entry.fieldSessionId = rec.fieldSessionId;
-        birdEvents.push({
-          ringNo: rec.ringNo,
-          eventType: type,
-          eventIndex: i,
-          data: entry
+      if (existingRingNos.has(rec.ringNo)) {
+        rs.status = "skipped";
+        rs.error = "duplicate_in_db";
+        task.commitState.skippedCount++;
+        task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "duplicate_in_db" });
+        continue;
+      }
+      if (!rec.ringNo || !rec.species) {
+        rs.status = "skipped";
+        rs.error = "missing_required_field";
+        task.commitState.skippedCount++;
+        task.commitState.skippedDetails.push({ ringNo: rec.ringNo || "(missing)", reason: "missing_required_field" });
+        continue;
+      }
+
+      const speciesCheck = await validateDictionaryValue("species", rec.species, { allowEmpty: false });
+      if (!speciesCheck.valid) {
+        rs.status = "skipped";
+        rs.error = "dictionary_validation_failed";
+        rs.invalidFields = ["species"];
+        task.commitState.skippedCount++;
+        task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "dictionary_validation_failed", invalidFields: ["species"] });
+        continue;
+      }
+
+      try {
+        const { bird, birdEvents } = buildBirdAndEvents(rec);
+        const assembledBird = reassembleBirdFromEvents(bird, [...eventsStore.events, ...birdEvents]);
+        persistRiskToBird(assembledBird);
+        bird.healthRisk = assembledBird.healthRisk;
+
+        const ring = await getRingStatus(bird.ringNo);
+        if (ring) {
+          if (ring.status === "allocated") {
+            throw new Error("ring_already_allocated");
+          }
+          if (ring._expiredReservation) {
+            throw new Error("ring_reservation_expired");
+          }
+          if (ring.status === "reserved" && !bird.fieldSessionId) {
+            throw new Error("ring_reserved");
+          }
+          if (ring.status === "reserved" && ring.reservedBy !== bird.fieldSessionId) {
+            throw new Error("ring_reserved_by_other_session");
+          }
+        }
+
+        birdsStore.birds.push(bird);
+        eventsStore.events.push(...birdEvents);
+        existingRingNos.add(rec.ringNo);
+
+        if (ring) {
+          await syncAllocateRing(bird.ringNo, bird.ringNo, { fieldSessionId: bird.fieldSessionId || null });
+        }
+
+        rs.status = "success";
+        task.commitState.successCount++;
+        task.commitState.importedRingNos.push(rec.ringNo);
+        task.commitState.processedRingNos.push(rec.ringNo);
+        processedRingNos.add(rec.ringNo);
+      } catch (e) {
+        rs.status = "failed";
+        rs.error = e.message;
+        task.commitState.failedCount++;
+        task.commitState.failedDetails.push({
+          index: idx,
+          ringNo: rec.ringNo || "(missing)",
+          error: e.message
         });
       }
+      task.commitState.processedCount++;
     }
 
-    const assembledBird = reassembleBirdFromEvents(bird, birdEvents);
-    persistRiskToBird(assembledBird);
-    bird.healthRisk = assembledBird.healthRisk;
+    await writeBirdsAndEventsStore(birdsStore, eventsStore);
+    task.commitState.lastBatchAt = new Date().toISOString();
 
-    birdsStore.birds.push(bird);
-    eventsStore.events.push(...birdEvents);
-    imported.push(reassembleBirdFromEvents(bird, [...eventsStore.events, ...birdEvents]));
-    existingRingNos.add(rec.ringNo);
+    const remaining = getNextPendingIndices(task, 1);
+    const isComplete = remaining.length === 0;
+
+    if (isComplete) {
+      task.status = task.commitState.failedCount > 0 ? TASK_STATUS.PARTIAL : TASK_STATUS.COMMITTED;
+      task.commitState.committedAt = new Date().toISOString();
+      await saveTask(task);
+      await recordAuditLogForTask(task);
+      return buildCommitResult(task, true);
+    } else {
+      task.status = TASK_STATUS.PARTIAL;
+      await saveTask(task);
+      return buildCommitResult(task, false);
+    }
+  } catch (e) {
+    task.status = (previousStatus === TASK_STATUS.PARTIAL) ? TASK_STATUS.PARTIAL : TASK_STATUS.READY;
+    await saveTask(task);
+    throw e;
   }
+}
 
-  for (const bird of imported) {
-    const ring = await getRingStatus(bird.ringNo);
-    if (!ring) continue;
-    if (ring.status === "allocated") {
-      throw new Error("ring_already_allocated");
-    }
-    if (ring._expiredReservation) {
-      throw new Error("ring_reservation_expired");
-    }
-    if (ring.status === "reserved" && !bird.fieldSessionId) {
-      throw new Error("ring_reserved");
-    }
-    if (ring.status === "reserved" && ring.reservedBy !== bird.fieldSessionId) {
-      throw new Error("ring_reserved_by_other_session");
-    }
-  }
+function buildCommitResult(task, completed) {
+  return {
+    taskId: task.taskId,
+    previewId: task.taskId,
+    imported: task.commitState.successCount,
+    skipped: task.commitState.skippedCount,
+    failed: task.commitState.failedCount,
+    skippedDetails: task.commitState.skippedDetails,
+    failedDetails: task.commitState.failedDetails,
+    completed,
+    progress: {
+      processed: task.commitState.processedCount,
+      total: task.records.length,
+      remaining: task.records.length - task.commitState.processedCount
+    },
+    status: task.status
+  };
+}
 
-  for (const bird of imported) {
-    await syncAllocateRing(bird.ringNo, bird.ringNo, { fieldSessionId: bird.fieldSessionId || null });
-  }
+async function recordAuditLogForTask(task) {
+  const importedRingNos = task.commitState.importedRingNos;
+  const fieldSessionValidationSummary = task.validation.fieldSessionValidationSummary || null;
+  const fieldSessionWarnings = task.validation.fieldSessionWarnings || [];
 
-  await writeBirdsAndEventsStore(birdsStore, eventsStore);
+  const birdsStore = await readBirdsStore();
+  const eventsStore = await readEventsStore();
+  const importedBirds = importedRingNos
+    .map(ringNo => {
+      const bird = birdsStore.birds.find(b => b.ringNo === ringNo);
+      if (!bird) return null;
+      return reassembleBirdFromEvents(bird, eventsStore.events);
+    })
+    .filter(Boolean);
 
-  preview.status = "committed";
-  preview.committedAt = new Date().toISOString();
-
-  const importedRingNos = imported.map(b => b.ringNo);
-  const fieldSessionValidationSummary = preview.validation.fieldSessionValidationSummary || null;
-  const fieldSessionWarnings = preview.validation.fieldSessionWarnings || [];
   await recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_BATCH_IMPORT,
     targetType: TARGET_TYPES.BIRD,
-    targetId: previewId,
+    targetId: task.taskId,
     requestSummary: {
-      previewId,
-      importedCount: imported.length,
-      skippedCount: skipped.length,
+      previewId: task.taskId,
+      taskId: task.taskId,
+      importedCount: task.commitState.successCount,
+      skippedCount: task.commitState.skippedCount,
+      failedCount: task.commitState.failedCount,
       importedRingNos,
-      skippedDetails: skipped,
+      skippedDetails: task.commitState.skippedDetails,
+      failedDetails: task.commitState.failedDetails,
       fieldSessionValidation: fieldSessionValidationSummary
         ? { ...fieldSessionValidationSummary, warnings: fieldSessionWarnings }
         : null
     },
     before: null,
-    after: imported.map(b => pickBirdKeyFields(b))
+    after: importedBirds.map(b => pickBirdKeyFields(b))
   });
-
-  return {
-    previewId,
-    imported: imported.length,
-    skipped: skipped.length,
-    skippedDetails: skipped
-  };
 }
 
-export { validateBirds, createPreview, getPreview, commitImport, KNOWN_SPECIES };
+export {
+  validateBirds,
+  createPreview,
+  getPreview,
+  commitImport,
+  listTasks,
+  KNOWN_SPECIES,
+  TASK_STATUS,
+  TASK_TTL_MS
+};

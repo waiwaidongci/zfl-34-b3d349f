@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initialize as initDataStore, getMigrationState } from "./dataStore.js";
 import { handleRingInventoryRoutes } from "./ringInventoryRoutes.js";
-import { createPreview, getPreview, commitImport } from "./importPreview.js";
+import { createPreview, getPreview, commitImport, listTasks } from "./importPreview.js";
 import {
   createSession,
   listSessions,
@@ -125,6 +125,40 @@ const server = http.createServer(async (req, res) => {
     if (backupHandled !== false) return;
 
     if (url.pathname.startsWith("/import")) {
+      if (req.method === "GET" && url.pathname === "/import/tasks") {
+        const tasks = await listTasks();
+        return send(res, 200, { tasks });
+      }
+
+      const taskDetailMatch = url.pathname.match(/^\/import\/tasks\/([^/]+)$/);
+      if (taskDetailMatch && req.method === "GET") {
+        const taskId = decodeURIComponent(taskDetailMatch[1]);
+        const task = await getPreview(taskId);
+        if (!task) return send(res, 404, { error: "task_not_found", message: "导入任务不存在或已过期" });
+        return send(res, 200, {
+          taskId: task.taskId,
+          previewId: task.taskId,
+          status: task.status,
+          validation: task.validation,
+          createdAt: new Date(task.createdAt).toISOString(),
+          expiresAt: new Date(task.createdAt + 24 * 60 * 60 * 1000).toISOString(),
+          commitState: task.commitState ? {
+            processedCount: task.commitState.processedCount,
+            successCount: task.commitState.successCount,
+            skippedCount: task.commitState.skippedCount,
+            failedCount: task.commitState.failedCount,
+            totalRecords: task.records.length,
+            perRecordStatus: task.commitState.perRecordStatus,
+            skippedDetails: task.commitState.skippedDetails,
+            failedDetails: task.commitState.failedDetails,
+            startedAt: task.commitState.startedAt,
+            lastBatchAt: task.commitState.lastBatchAt,
+            committedAt: task.commitState.committedAt
+          } : null,
+          committedAt: task.commitState?.committedAt || null
+        });
+      }
+
       if (req.method === "POST" && url.pathname === "/import/preview") {
         const input = await body(req);
         if (!input.records || !Array.isArray(input.records)) {
@@ -134,7 +168,8 @@ const server = http.createServer(async (req, res) => {
           const birds = await listBirds();
           const preview = await createPreview(input.records, birds);
           return send(res, 200, {
-            previewId: preview.previewId,
+            previewId: preview.taskId,
+            taskId: preview.taskId,
             status: preview.status,
             validation: preview.validation,
             createdAt: new Date(preview.createdAt).toISOString()
@@ -150,14 +185,26 @@ const server = http.createServer(async (req, res) => {
       const previewMatch = url.pathname.match(/^\/import\/preview\/([^/]+)$/);
       if (previewMatch && req.method === "GET") {
         const previewId = decodeURIComponent(previewMatch[1]);
-        const preview = getPreview(previewId);
+        const preview = await getPreview(previewId);
         if (!preview) return send(res, 404, { error: "preview_not_found", message: "预览不存在或已过期" });
         return send(res, 200, {
-          previewId: preview.previewId,
+          previewId: preview.taskId,
+          taskId: preview.taskId,
           status: preview.status,
           validation: preview.validation,
           createdAt: new Date(preview.createdAt).toISOString(),
-          committedAt: preview.committedAt || null
+          expiresAt: new Date(preview.createdAt + 24 * 60 * 60 * 1000).toISOString(),
+          commitState: preview.commitState ? {
+            processedCount: preview.commitState.processedCount,
+            successCount: preview.commitState.successCount,
+            skippedCount: preview.commitState.skippedCount,
+            failedCount: preview.commitState.failedCount,
+            totalRecords: preview.records.length,
+            startedAt: preview.commitState.startedAt,
+            lastBatchAt: preview.commitState.lastBatchAt,
+            committedAt: preview.commitState.committedAt
+          } : null,
+          committedAt: preview.commitState?.committedAt || null
         });
       }
 
@@ -165,11 +212,33 @@ const server = http.createServer(async (req, res) => {
       if (commitMatch && req.method === "POST") {
         const previewId = decodeURIComponent(commitMatch[1]);
         try {
-          const result = await commitImport(previewId);
-          return send(res, 200, result);
+          const input = await body(req);
+          const batchSize = input?.batchSize && Number(input.batchSize) > 0 ? Number(input.batchSize) : undefined;
+          const result = await commitImport(previewId, { batchSize });
+          const response = {
+            previewId: result.previewId || result.taskId,
+            taskId: result.taskId,
+            imported: result.imported,
+            skipped: result.skipped,
+            skippedDetails: result.skippedDetails,
+            failed: result.failed,
+            failedDetails: result.failedDetails,
+            completed: result.completed,
+            alreadyCommitted: result.alreadyCommitted || false,
+            progress: result.progress,
+            status: result.status
+          };
+          if (result.failed === undefined) {
+            delete response.failed;
+          }
+          if (result.failedDetails === undefined) {
+            delete response.failedDetails;
+          }
+          return send(res, 200, response);
         } catch (e) {
           switch (e.message) {
             case "preview_not_found": return send(res, 404, { error: "preview_not_found", message: "预览不存在或已过期" });
+            case "task_expired": return send(res, 410, { error: "task_expired", message: "导入任务已过期" });
             case "already_committed": return send(res, 409, { error: "already_committed", message: "该预览已提交，不可重复写入" });
             case "has_blocking_errors": return send(res, 422, { error: "has_blocking_errors", message: "存在阻断性错误，请修正后重新提交预览" });
             case "ring_reserved": return send(res, 409, { error: "ring_reserved", message: "环号已被预留" });
@@ -359,6 +428,7 @@ const server = http.createServer(async (req, res) => {
         "GET /field-sessions/:id", "PUT /field-sessions/:id", "DELETE /field-sessions/:id",
         "GET /field-sessions/summary", "GET /field-sessions/:id/detail",
         "POST /import/preview", "GET /import/preview/:previewId", "POST /import/commit/:previewId",
+        "GET /import/tasks", "GET /import/tasks/:taskId",
         "GET /dictionaries", "GET /dictionaries/:type", "POST /dictionaries/:type",
         "PUT /dictionaries/:type/:value", "DELETE /dictionaries/:type/:value",
         "GET /audit-logs?dateFrom=&dateTo=&operationType=&ringNo=&targetId=&limit=&offset=",

@@ -142,6 +142,27 @@
         "weight": 500,
         "bill": 43
       }
+    },
+    {
+      "ringNo": "SB-TEST-001",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-21",
+        "wing": 320,
+        "weight": 500,
+        "fieldSessionId": "FS-2026-0503-001"
+      }
+    },
+    {
+      "ringNo": "SB-TEST-002",
+      "eventType": "measurements",
+      "eventIndex": 0,
+      "data": {
+        "at": "2026-06-21",
+        "wing": 315,
+        "weight": 480
+      }
     }
   ]
 }

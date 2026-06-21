@@ -1,0 +1,25 @@
+{
+  "tasks": [
+    {
+      "taskId": "IMP-MQNCS4MA-6f66a9",
+      "createdAt": 1782020140643,
+      "expiresAt": 1782106540643,
+      "status": "committed",
+      "totalRecords": 2,
+      "validation": {
+        "hasBlockingErrors": false,
+        "validRecords": 2,
+        "fieldErrors": 0,
+        "duplicateInDb": 0
+      },
+      "commitProgress": {
+        "processed": 2,
+        "committed": 2,
+        "skipped": 0,
+        "failed": 0,
+        "total": 2
+      },
+      "committedAt": "2026-06-21T05:36:03.698Z"
+    }
+  ]
+}
