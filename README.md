@@ -1691,7 +1691,7 @@ curl -s http://localhost:3034/backups/snapshots/<SNAPSHOT_ID> | python3 -m json.
 curl -s -X POST http://localhost:3034/backups/snapshots | python3 -m json.tool
 
 # 步骤2：执行恢复（替换 <SNAPSHOT_ID>）
-curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m ```bash
+curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m json.tool
 # 步骤3：验证恢复后数据可正常读取
 curl -s http://localhost:3034/birds | python3 -m json.tool
 curl -s http://localhost:3034/reports/recapture-rate | python3 -m json.tool

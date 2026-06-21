@@ -114,18 +114,32 @@ else
 fi
 echo ""
 
-info "步骤 6: 测试 snapshots 目录隔离"
+info "步骤 6: 测试 snapshots 目录隔离和恢复"
 node -e "
 (async () => {
-    const { createSnapshot, listSnapshots } = await import('./backupService.js');
+    const { createSnapshot, listSnapshots, restoreFromSnapshot } = await import('./backupService.js');
+    const { readBirdsStore, writeBirdsAndEventsStore } = await import('./dataStore.js');
     const snapshot = await createSnapshot();
     console.log('快照ID:', snapshot.snapshotId);
     const list = await listSnapshots();
     console.log('快照列表数量:', list.length);
+    const before = await readBirdsStore();
+    await writeBirdsAndEventsStore(
+        { birds: [...before.birds, { ringNo: 'SNAP-RESTORE-TEMP', species: '黑尾鸥' }] },
+        { events: [] }
+    );
+    const changed = await readBirdsStore();
+    console.log('恢复前包含临时鸟:', changed.birds.some(b => b.ringNo === 'SNAP-RESTORE-TEMP'));
+    await restoreFromSnapshot(snapshot.snapshotId);
+    const restored = await readBirdsStore();
+    console.log('恢复后包含临时鸟:', restored.birds.some(b => b.ringNo === 'SNAP-RESTORE-TEMP'));
+    if (restored.birds.some(b => b.ringNo === 'SNAP-RESTORE-TEMP')) {
+        throw new Error('snapshot_restore_failed');
+    }
 })();
 "
 if [ $? -eq 0 ] && [ -d "$TEST_DIR/snapshots" ] && [ -f "$TEST_DIR/snapshots/index.json" ]; then
-    pass "快照隔离测试 - snapshots 目录和索引创建成功"
+    pass "快照隔离测试 - snapshots 目录、索引和恢复流程成功"
     SNAP_FILES=$(ls "$TEST_DIR/snapshots"/SNAP-*.json 2>/dev/null | wc -l)
     if [ "$SNAP_FILES" -eq 1 ]; then
         pass "快照隔离测试 - 快照文件创建在隔离目录"
