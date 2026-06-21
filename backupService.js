@@ -595,3 +595,512 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
     diff: diff.summary
   };
 }
+
+async function loadAllStoresForConsistency() {
+  await initialize();
+  const [birdsStore, eventsStore, dictionariesStore, fieldSessionsStore, ringInventoryStore, auditLogsStore] = await Promise.all([
+    readStore("birds"),
+    readStore("events"),
+    readStore("dictionaries"),
+    readStore("fieldSessions"),
+    readStore("ringInventory"),
+    readStore("auditLogs")
+  ]);
+  return {
+    birds: birdsStore.birds || [],
+    events: eventsStore.events || [],
+    dictionaries: dictionariesStore || { species: [], capturePlace: [], season: [] },
+    fieldSessions: fieldSessionsStore.fieldSessions || [],
+    ringInventory: ringInventoryStore || { batches: [], rings: [] },
+    auditLogs: auditLogsStore.logs || []
+  };
+}
+
+export async function checkConsistency() {
+  const db = await loadAllStoresForConsistency();
+  const repairable = [];
+  const nonRepairable = [];
+
+  const birdRingNoSet = new Set(db.birds.map(b => b.ringNo));
+  const sessionMap = new Map(db.fieldSessions.map(s => [s.id, s]));
+  const batchMap = new Map((db.ringInventory.batches || []).map(b => [b.id, b]));
+  const ringMap = new Map((db.ringInventory.rings || []).map(r => [r.ringNo, r]));
+
+  const dictValues = {};
+  for (const type of ["species", "capturePlace", "season"]) {
+    dictValues[type] = new Set((db.dictionaries[type] || []).map(e => e.value));
+  }
+
+  const orphanEvents = db.events.filter(e => !birdRingNoSet.has(e.ringNo));
+  if (orphanEvents.length > 0) {
+    repairable.push({
+      type: "orphan_events",
+      description: "事件引用了不存在的鸟类环号",
+      count: orphanEvents.length,
+      details: orphanEvents.map(e => ({ ringNo: e.ringNo, eventType: e.eventType, eventIndex: e.eventIndex })),
+      repairAction: "remove_orphan_events",
+      repairHint: "移除所有引用不存在环号的事件"
+    });
+  }
+
+  const eventsByBirdType = new Map();
+  for (const e of db.events) {
+    const key = `${e.ringNo}|${e.eventType}`;
+    if (!eventsByBirdType.has(key)) eventsByBirdType.set(key, []);
+    eventsByBirdType.get(key).push(e);
+  }
+
+  const duplicateIndexItems = [];
+  for (const [key, evts] of eventsByBirdType) {
+    const indexCount = {};
+    for (const e of evts) {
+      const idx = e.eventIndex;
+      indexCount[idx] = (indexCount[idx] || 0) + 1;
+    }
+    for (const [idx, count] of Object.entries(indexCount)) {
+      if (count > 1) {
+        duplicateIndexItems.push({
+          key,
+          eventIndex: Number(idx),
+          count,
+          events: evts.filter(e => e.eventIndex === Number(idx)).map(e => ({ ringNo: e.ringNo, eventType: e.eventType, eventIndex: e.eventIndex }))
+        });
+      }
+    }
+  }
+  if (duplicateIndexItems.length > 0) {
+    repairable.push({
+      type: "duplicate_event_index",
+      description: "同一环号+事件类型下存在重复的eventIndex",
+      count: duplicateIndexItems.length,
+      details: duplicateIndexItems,
+      repairAction: "reindex_events",
+      repairHint: "重新编排eventIndex使同一环号+事件类型下索引连续无重复"
+    });
+  }
+
+  const indexGapItems = [];
+  for (const [key, evts] of eventsByBirdType) {
+    const sorted = [...evts].sort((a, b) => a.eventIndex - b.eventIndex);
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].eventIndex !== i) {
+        indexGapItems.push({
+          key,
+          expectedIndex: i,
+          actualIndex: sorted[i].eventIndex,
+          ringNo: sorted[i].ringNo,
+          eventType: sorted[i].eventType
+        });
+        break;
+      }
+    }
+  }
+  if (indexGapItems.length > 0) {
+    repairable.push({
+      type: "event_index_gap",
+      description: "同一环号+事件类型下eventIndex不连续",
+      count: indexGapItems.length,
+      details: indexGapItems,
+      repairAction: "reindex_events",
+      repairHint: "重新编排eventIndex使索引从0连续递增"
+    });
+  }
+
+  const unknownDictValues = [];
+  for (const bird of db.birds) {
+    if (bird.species && !dictValues.species.has(bird.species)) {
+      unknownDictValues.push({ source: "bird", ringNo: bird.ringNo, dictType: "species", value: bird.species });
+    }
+    if (bird.capturePlace && !dictValues.capturePlace.has(bird.capturePlace)) {
+      unknownDictValues.push({ source: "bird", ringNo: bird.ringNo, dictType: "capturePlace", value: bird.capturePlace });
+    }
+    if (bird.season && !dictValues.season.has(bird.season)) {
+      unknownDictValues.push({ source: "bird", ringNo: bird.ringNo, dictType: "season", value: bird.season });
+    }
+  }
+  for (const session of db.fieldSessions) {
+    if (session.season && !dictValues.season.has(session.season)) {
+      unknownDictValues.push({ source: "fieldSession", id: session.id, dictType: "season", value: session.season });
+    }
+    if (session.capturePlace && !dictValues.capturePlace.has(session.capturePlace)) {
+      unknownDictValues.push({ source: "fieldSession", id: session.id, dictType: "capturePlace", value: session.capturePlace });
+    }
+  }
+  if (unknownDictValues.length > 0) {
+    const deduped = [];
+    const seen = new Set();
+    for (const item of unknownDictValues) {
+      const dedupeKey = `${item.dictType}|${item.value}`;
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        deduped.push({ dictType: item.dictType, value: item.value, referencedBy: unknownDictValues.filter(i => i.dictType === item.dictType && i.value === item.value).length });
+      }
+    }
+    repairable.push({
+      type: "unknown_dict_values",
+      description: "鸟类或场次引用了字典中不存在的值",
+      count: deduped.length,
+      details: deduped,
+      repairAction: "add_missing_dict_entries",
+      repairHint: "将缺失的字典值添加到对应字典类型中"
+    });
+  }
+
+  const unallocatedRings = [];
+  for (const bird of db.birds) {
+    const ring = ringMap.get(bird.ringNo);
+    if (!ring) {
+      unallocatedRings.push({ ringNo: bird.ringNo, reason: "ring_not_in_inventory" });
+    } else if (ring.status !== "allocated") {
+      unallocatedRings.push({ ringNo: bird.ringNo, reason: "ring_not_allocated", currentStatus: ring.status });
+    }
+  }
+  if (unallocatedRings.length > 0) {
+    repairable.push({
+      type: "unallocated_ring_in_use",
+      description: "鸟类已使用但环号库存未分配",
+      count: unallocatedRings.length,
+      details: unallocatedRings,
+      repairAction: "allocate_used_rings",
+      repairHint: "将已使用但未分配的环号状态设为allocated"
+    });
+  }
+
+  const orphanRingBatches = (db.ringInventory.rings || []).filter(r => r.batchId && !batchMap.has(r.batchId));
+  if (orphanRingBatches.length > 0) {
+    nonRepairable.push({
+      type: "orphan_ring_batch_ref",
+      description: "环号引用了不存在的批次ID",
+      count: orphanRingBatches.length,
+      details: orphanRingBatches.map(r => ({ ringNo: r.ringNo, batchId: r.batchId }))
+    });
+  }
+
+  const sessionStatsMismatches = [];
+  for (const session of db.fieldSessions) {
+    const sessionEvents = db.events.filter(e =>
+      e.data && e.data.fieldSessionId === session.id
+    );
+    const actualCaptured = sessionEvents.filter(e => e.eventType === "measurements").length;
+    const actualReleased = sessionEvents.filter(e => e.eventType === "releases").length;
+    const capturedMismatch = session.capturedCount !== undefined && session.capturedCount !== actualCaptured;
+    const releasedMismatch = session.releasedCount !== undefined && session.releasedCount !== actualReleased;
+    if (capturedMismatch || releasedMismatch) {
+      sessionStatsMismatches.push({
+        sessionId: session.id,
+        date: session.date,
+        capturedCount: { expected: actualCaptured, actual: session.capturedCount },
+        releasedCount: { expected: actualReleased, actual: session.releasedCount }
+      });
+    }
+  }
+  if (sessionStatsMismatches.length > 0) {
+    repairable.push({
+      type: "session_stats_mismatch",
+      description: "场次统计数字与实际事件数不一致",
+      count: sessionStatsMismatches.length,
+      details: sessionStatsMismatches,
+      repairAction: "recalculate_session_stats",
+      repairHint: "根据实际事件重新计算场次的capturedCount和releasedCount"
+    });
+  }
+
+  const birdSessionRefs = [];
+  for (const bird of db.birds) {
+    if (bird.fieldSessionId && !sessionMap.has(bird.fieldSessionId)) {
+      birdSessionRefs.push({ ringNo: bird.ringNo, fieldSessionId: bird.fieldSessionId });
+    }
+  }
+  if (birdSessionRefs.length > 0) {
+    nonRepairable.push({
+      type: "bird_invalid_session_ref",
+      description: "鸟类引用了不存在的场次ID",
+      count: birdSessionRefs.length,
+      details: birdSessionRefs
+    });
+  }
+
+  const eventSessionRefs = [];
+  for (const e of db.events) {
+    if (e.data && e.data.fieldSessionId && !sessionMap.has(e.data.fieldSessionId)) {
+      eventSessionRefs.push({ ringNo: e.ringNo, eventType: e.eventType, eventIndex: e.eventIndex, fieldSessionId: e.data.fieldSessionId });
+    }
+  }
+  if (eventSessionRefs.length > 0) {
+    nonRepairable.push({
+      type: "event_invalid_session_ref",
+      description: "事件引用了不存在的场次ID",
+      count: eventSessionRefs.length,
+      details: eventSessionRefs
+    });
+  }
+
+  const result = {
+    checkedAt: new Date().toISOString(),
+    summary: {
+      totalBirds: db.birds.length,
+      totalEvents: db.events.length,
+      totalFieldSessions: db.fieldSessions.length,
+      totalRings: (db.ringInventory.rings || []).length,
+      totalBatches: (db.ringInventory.batches || []).length,
+      repairableCount: repairable.length,
+      nonRepairableCount: nonRepairable.length
+    },
+    repairable,
+    nonRepairable
+  };
+
+  await recordAuditLog({
+    operationType: OPERATION_TYPES.SYSTEM_CONSISTENCY_CHECK,
+    targetType: TARGET_TYPES.SYSTEM,
+    targetId: "consistency-check",
+    requestSummary: {
+      repairableCount: repairable.length,
+      nonRepairableCount: nonRepairable.length,
+      repairableTypes: repairable.map(r => r.type),
+      nonRepairableTypes: nonRepairable.map(r => r.type)
+    },
+    before: null,
+    after: null
+  });
+
+  return result;
+}
+
+function buildRepairPlanSignature(repairPlan) {
+  const items = (repairPlan || []).slice().sort((a, b) => (a.action || "").localeCompare(b.action || ""));
+  return JSON.stringify(items);
+}
+
+export async function repairConsistency(repairPlan) {
+  if (!Array.isArray(repairPlan) || repairPlan.length === 0) {
+    throw new Error("empty_repair_plan");
+  }
+
+  const validActions = [
+    "remove_orphan_events",
+    "reindex_events",
+    "add_missing_dict_entries",
+    "allocate_used_rings",
+    "recalculate_session_stats"
+  ];
+  for (const item of repairPlan) {
+    if (!validActions.includes(item.action)) {
+      throw new Error(`invalid_repair_action: ${item.action}`);
+    }
+  }
+
+  const planSignature = buildRepairPlanSignature(repairPlan);
+  const checkResult = await checkConsistency();
+  const expectedActions = checkResult.repairable.map(r => r.repairAction);
+  const planActions = repairPlan.map(p => p.action);
+  for (const action of planActions) {
+    if (!expectedActions.includes(action)) {
+      throw new Error(`action_not_needed: ${action}`);
+    }
+  }
+
+  const db = await loadAllStoresForConsistency();
+
+  const newEvents = db.events.map(e => ({ ...e }));
+  const newDictionaries = JSON.parse(JSON.stringify(db.dictionaries));
+  const newRingInventory = JSON.parse(JSON.stringify(db.ringInventory));
+  const newFieldSessions = db.fieldSessions.map(s => ({ ...s }));
+  const newBirds = db.birds.map(b => ({ ...b }));
+
+  const repairDetails = [];
+
+  for (const item of repairPlan) {
+    switch (item.action) {
+      case "remove_orphan_events": {
+        const birdRingNoSet = new Set(newBirds.map(b => b.ringNo));
+        const beforeCount = newEvents.length;
+        const removed = [];
+        const kept = [];
+        for (const e of newEvents) {
+          if (!birdRingNoSet.has(e.ringNo)) {
+            removed.push({ ringNo: e.ringNo, eventType: e.eventType, eventIndex: e.eventIndex });
+          } else {
+            kept.push(e);
+          }
+        }
+        newEvents.length = 0;
+        newEvents.push(...kept);
+        repairDetails.push({ action: item.action, removedCount: removed.length, beforeCount, afterCount: newEvents.length });
+        break;
+      }
+      case "reindex_events": {
+        const grouped = new Map();
+        for (const e of newEvents) {
+          const key = `${e.ringNo}|${e.eventType}`;
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key).push(e);
+        }
+        let reindexedCount = 0;
+        for (const [, evts] of grouped) {
+          evts.sort((a, b) => a.eventIndex - b.eventIndex);
+          for (let i = 0; i < evts.length; i++) {
+            if (evts[i].eventIndex !== i) {
+              evts[i].eventIndex = i;
+              reindexedCount++;
+            }
+          }
+        }
+        repairDetails.push({ action: item.action, reindexedCount });
+        break;
+      }
+      case "add_missing_dict_entries": {
+        const dictValues = {};
+        for (const type of ["species", "capturePlace", "season"]) {
+          dictValues[type] = new Set((newDictionaries[type] || []).map(e => e.value));
+        }
+        const addedEntries = [];
+        for (const bird of newBirds) {
+          if (bird.species && !dictValues.species.has(bird.species)) {
+            const entry = { value: bird.species, description: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (!newDictionaries.species) newDictionaries.species = [];
+            newDictionaries.species.push(entry);
+            dictValues.species.add(bird.species);
+            addedEntries.push({ type: "species", value: bird.species });
+          }
+          if (bird.capturePlace && !dictValues.capturePlace.has(bird.capturePlace)) {
+            const entry = { value: bird.capturePlace, description: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (!newDictionaries.capturePlace) newDictionaries.capturePlace = [];
+            newDictionaries.capturePlace.push(entry);
+            dictValues.capturePlace.add(bird.capturePlace);
+            addedEntries.push({ type: "capturePlace", value: bird.capturePlace });
+          }
+          if (bird.season && !dictValues.season.has(bird.season)) {
+            const entry = { value: bird.season, description: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (!newDictionaries.season) newDictionaries.season = [];
+            newDictionaries.season.push(entry);
+            dictValues.season.add(bird.season);
+            addedEntries.push({ type: "season", value: bird.season });
+          }
+        }
+        for (const session of newFieldSessions) {
+          if (session.season && !dictValues.season.has(session.season)) {
+            const entry = { value: session.season, description: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (!newDictionaries.season) newDictionaries.season = [];
+            newDictionaries.season.push(entry);
+            dictValues.season.add(session.season);
+            addedEntries.push({ type: "season", value: session.season });
+          }
+          if (session.capturePlace && !dictValues.capturePlace.has(session.capturePlace)) {
+            const entry = { value: session.capturePlace, description: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (!newDictionaries.capturePlace) newDictionaries.capturePlace = [];
+            newDictionaries.capturePlace.push(entry);
+            dictValues.capturePlace.add(session.capturePlace);
+            addedEntries.push({ type: "capturePlace", value: session.capturePlace });
+          }
+        }
+        const uniqueAdded = [];
+        const seenAdded = new Set();
+        for (const a of addedEntries) {
+          const k = `${a.type}|${a.value}`;
+          if (!seenAdded.has(k)) { seenAdded.add(k); uniqueAdded.push(a); }
+        }
+        repairDetails.push({ action: item.action, addedEntries: uniqueAdded, addedCount: uniqueAdded.length });
+        break;
+      }
+      case "allocate_used_rings": {
+        const birdRingNoSet = new Set(newBirds.map(b => b.ringNo));
+        const rings = newRingInventory.rings || [];
+        const allocatedRings = [];
+        for (const ring of rings) {
+          if (birdRingNoSet.has(ring.ringNo) && ring.status !== "allocated") {
+            const prevStatus = ring.status;
+            ring.status = "allocated";
+            ring.allocatedTo = ring.ringNo;
+            ring.allocatedAt = new Date().toISOString();
+            allocatedRings.push({ ringNo: ring.ringNo, previousStatus: prevStatus });
+          }
+        }
+        for (const bird of newBirds) {
+          if (!rings.find(r => r.ringNo === bird.ringNo)) {
+            const newRing = {
+              ringNo: bird.ringNo,
+              batchId: null,
+              status: "allocated",
+              allocatedTo: bird.ringNo,
+              allocatedAt: new Date().toISOString(),
+              reservedBy: null,
+              reservedAt: null,
+              reservedExpiresAt: null
+            };
+            rings.push(newRing);
+            allocatedRings.push({ ringNo: bird.ringNo, previousStatus: "not_in_inventory" });
+          }
+        }
+        repairDetails.push({ action: item.action, allocatedCount: allocatedRings.length, details: allocatedRings });
+        break;
+      }
+      case "recalculate_session_stats": {
+        const sessionMap = new Map(newFieldSessions.map(s => [s.id, s]));
+        const recalculated = [];
+        for (const session of newFieldSessions) {
+          const sessionEvents = newEvents.filter(e =>
+            e.data && e.data.fieldSessionId === session.id
+          );
+          const actualCaptured = sessionEvents.filter(e => e.eventType === "measurements").length;
+          const actualReleased = sessionEvents.filter(e => e.eventType === "releases").length;
+          const beforeCaptured = session.capturedCount;
+          const beforeReleased = session.releasedCount;
+          if (session.capturedCount !== actualCaptured || session.releasedCount !== actualReleased) {
+            session.capturedCount = actualCaptured;
+            session.releasedCount = actualReleased;
+            recalculated.push({
+              sessionId: session.id,
+              capturedCount: { before: beforeCaptured, after: actualCaptured },
+              releasedCount: { before: beforeReleased, after: actualReleased }
+            });
+          }
+        }
+        repairDetails.push({ action: item.action, recalculatedCount: recalculated.length, details: recalculated });
+        break;
+      }
+    }
+  }
+
+  const writeBatch = [];
+  writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
+  writeBatch.push([STORE_FILES.events, { events: newEvents }]);
+  writeBatch.push([STORE_FILES.dictionaries, newDictionaries]);
+  writeBatch.push([STORE_FILES.fieldSessions, { fieldSessions: newFieldSessions }]);
+  writeBatch.push([STORE_FILES.ringInventory, newRingInventory]);
+
+  await atomicWriteMulti(writeBatch);
+
+  await recordAuditLog({
+    operationType: OPERATION_TYPES.SYSTEM_CONSISTENCY_REPAIR,
+    targetType: TARGET_TYPES.SYSTEM,
+    targetId: "consistency-repair",
+    requestSummary: {
+      planSignature,
+      repairActions: repairPlan.map(p => p.action),
+      repairDetails
+    },
+    before: {
+      repairableCount: checkResult.repairable.length,
+      nonRepairableCount: checkResult.nonRepairable.length,
+      repairableTypes: checkResult.repairable.map(r => r.type)
+    },
+    after: {
+      repairDetails
+    }
+  });
+
+  const recheckResult = await checkConsistency();
+
+  return {
+    repairedAt: new Date().toISOString(),
+    appliedActions: repairPlan.map(p => p.action),
+    repairDetails,
+    recheck: {
+      repairableCount: recheckResult.repairable.length,
+      nonRepairableCount: recheckResult.nonRepairable.length,
+      repairableTypes: recheckResult.repairable.map(r => r.type),
+      nonRepairableTypes: recheckResult.nonRepairable.map(r => r.type)
+    }
+  };
+}

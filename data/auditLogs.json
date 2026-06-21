@@ -1696,6 +1696,257 @@
           ]
         }
       }
+    },
+    {
+      "id": "LOG-MQNBIOTA-3ca61924",
+      "timestamp": "2026-06-21T05:00:20.638Z",
+      "operationType": "system_consistency_check",
+      "targetType": "system",
+      "targetId": "consistency-check",
+      "requestSummary": {
+        "repairableCount": 2,
+        "nonRepairableCount": 0,
+        "repairableTypes": [
+          "unallocated_ring_in_use",
+          "session_stats_mismatch"
+        ],
+        "nonRepairableTypes": []
+      },
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "LOG-MQNBJ5KL-70552108",
+      "timestamp": "2026-06-21T05:00:42.357Z",
+      "operationType": "system_consistency_check",
+      "targetType": "system",
+      "targetId": "consistency-check",
+      "requestSummary": {
+        "repairableCount": 2,
+        "nonRepairableCount": 0,
+        "repairableTypes": [
+          "unallocated_ring_in_use",
+          "session_stats_mismatch"
+        ],
+        "nonRepairableTypes": []
+      },
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "LOG-MQNBJ5KX-fb984a83",
+      "timestamp": "2026-06-21T05:00:42.369Z",
+      "operationType": "system_consistency_check",
+      "targetType": "system",
+      "targetId": "consistency-check",
+      "requestSummary": {
+        "repairableCount": 2,
+        "nonRepairableCount": 0,
+        "repairableTypes": [
+          "unallocated_ring_in_use",
+          "session_stats_mismatch"
+        ],
+        "nonRepairableTypes": []
+      },
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "LOG-MQNBJ5L3-f0bd8eca",
+      "timestamp": "2026-06-21T05:00:42.375Z",
+      "operationType": "system_consistency_repair",
+      "targetType": "system",
+      "targetId": "consistency-repair",
+      "requestSummary": {
+        "planSignature": "[{\"action\":\"allocate_used_rings\"},{\"action\":\"recalculate_session_stats\"}]",
+        "repairActions": [
+          "allocate_used_rings",
+          "recalculate_session_stats"
+        ],
+        "repairDetails": [
+          {
+            "action": "allocate_used_rings",
+            "allocatedCount": 8,
+            "details": [
+              {
+                "ringNo": "SB-26002",
+                "previousStatus": "reserved"
+              },
+              {
+                "ringNo": "SB-26005",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26006",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26008",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26010",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26020",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26021",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26022",
+                "previousStatus": "not_in_inventory"
+              }
+            ]
+          },
+          {
+            "action": "recalculate_session_stats",
+            "recalculatedCount": 3,
+            "details": [
+              {
+                "sessionId": "FS-2026-0503-001",
+                "capturedCount": {
+                  "before": 15,
+                  "after": 2
+                },
+                "releasedCount": {
+                  "before": 15,
+                  "after": 2
+                }
+              },
+              {
+                "sessionId": "FS-2026-0611-001",
+                "capturedCount": {
+                  "before": 8,
+                  "after": 0
+                },
+                "releasedCount": {
+                  "before": 8,
+                  "after": 0
+                }
+              },
+              {
+                "sessionId": "FS-2026-0618-OCZL",
+                "capturedCount": {
+                  "before": 3,
+                  "after": 1
+                },
+                "releasedCount": {
+                  "before": 3,
+                  "after": 1
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "before": {
+        "repairableCount": 2,
+        "nonRepairableCount": 0,
+        "repairableTypes": [
+          "unallocated_ring_in_use",
+          "session_stats_mismatch"
+        ]
+      },
+      "after": {
+        "repairDetails": [
+          {
+            "action": "allocate_used_rings",
+            "allocatedCount": 8,
+            "details": [
+              {
+                "ringNo": "SB-26002",
+                "previousStatus": "reserved"
+              },
+              {
+                "ringNo": "SB-26005",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26006",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26008",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26010",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26020",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26021",
+                "previousStatus": "not_in_inventory"
+              },
+              {
+                "ringNo": "SB-26022",
+                "previousStatus": "not_in_inventory"
+              }
+            ]
+          },
+          {
+            "action": "recalculate_session_stats",
+            "recalculatedCount": 3,
+            "details": [
+              {
+                "sessionId": "FS-2026-0503-001",
+                "capturedCount": {
+                  "before": 15,
+                  "after": 2
+                },
+                "releasedCount": {
+                  "before": 15,
+                  "after": 2
+                }
+              },
+              {
+                "sessionId": "FS-2026-0611-001",
+                "capturedCount": {
+                  "before": 8,
+                  "after": 0
+                },
+                "releasedCount": {
+                  "before": 8,
+                  "after": 0
+                }
+              },
+              {
+                "sessionId": "FS-2026-0618-OCZL",
+                "capturedCount": {
+                  "before": 3,
+                  "after": 1
+                },
+                "releasedCount": {
+                  "before": 3,
+                  "after": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "LOG-MQNBJ5L6-214e56a4",
+      "timestamp": "2026-06-21T05:00:42.378Z",
+      "operationType": "system_consistency_check",
+      "targetType": "system",
+      "targetId": "consistency-check",
+      "requestSummary": {
+        "repairableCount": 0,
+        "nonRepairableCount": 0,
+        "repairableTypes": [],
+        "nonRepairableTypes": []
+      },
+      "before": null,
+      "after": null
     }
   ]
 }

@@ -12,8 +12,8 @@
       ],
       "weather": "晴，风力3级",
       "tide": "高潮 08:20，潮高2.1m",
-      "capturedCount": 15,
-      "releasedCount": 15,
+      "capturedCount": 2,
+      "releasedCount": 2,
       "notes": "鸟群活跃度高，无异常情况",
       "createdAt": "2026-05-03T10:00:00.000Z",
       "updatedAt": "2026-05-03T18:00:00.000Z"
@@ -29,8 +29,8 @@
       ],
       "weather": "多云，风力4级",
       "tide": "低潮 10:15，潮高0.8m",
-      "capturedCount": 8,
-      "releasedCount": 8,
+      "capturedCount": 0,
+      "releasedCount": 0,
       "notes": "部分个体处于换羽期",
       "createdAt": "2026-06-11T08:00:00.000Z",
       "updatedAt": "2026-06-11T16:30:00.000Z"
@@ -46,8 +46,8 @@
       ],
       "weather": "晴，风力2级",
       "tide": null,
-      "capturedCount": 3,
-      "releasedCount": 3,
+      "capturedCount": 1,
+      "releasedCount": 1,
       "notes": "测试离线同步作业场次",
       "createdAt": "2026-06-20T15:04:20.804Z",
       "updatedAt": "2026-06-20T15:04:20.804Z"

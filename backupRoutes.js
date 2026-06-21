@@ -2,7 +2,9 @@ import {
   createSnapshot,
   listSnapshots,
   getSnapshotSummary,
-  restoreFromSnapshot
+  restoreFromSnapshot,
+  checkConsistency,
+  repairConsistency
 } from "./backupService.js";
 
 async function parseBody(req) {
@@ -103,6 +105,39 @@ export async function handleBackupRoutes(req, res, url, send) {
             validationErrors: e.validationErrors || []
           });
         default:
+          throw e;
+      }
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/backups/consistency-check") {
+    try {
+      const result = await checkConsistency();
+      return send(res, 200, result);
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/backups/consistency-repair") {
+    try {
+      const body = await parseBody(req);
+      if (!Array.isArray(body.repairPlan)) {
+        return send(res, 400, { error: "invalid_repair_plan", message: "请求体需包含 repairPlan 数组" });
+      }
+      const result = await repairConsistency(body.repairPlan);
+      return send(res, 200, result);
+    } catch (e) {
+      switch (e.message) {
+        case "empty_repair_plan":
+          return send(res, 400, { error: "empty_repair_plan", message: "修复计划不能为空" });
+        default:
+          if (e.message.startsWith("invalid_repair_action:")) {
+            return send(res, 400, { error: "invalid_repair_action", message: `无效的修复操作: ${e.message.replace("invalid_repair_action: ", "")}` });
+          }
+          if (e.message.startsWith("action_not_needed:")) {
+            return send(res, 409, { error: "action_not_needed", message: `当前不存在需要修复的问题: ${e.message.replace("action_not_needed: ", "")}` });
+          }
           throw e;
       }
     }

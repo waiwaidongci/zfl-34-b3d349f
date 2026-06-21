@@ -366,6 +366,7 @@ const server = http.createServer(async (req, res) => {
         "POST /backups/snapshots", "GET /backups/snapshots",
         "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/preview",
         "POST /backups/snapshots/:id/restore", "POST /backups/snapshots/:id/restore?previewOnly=true",
+        "GET /backups/consistency-check", "POST /backups/consistency-repair",
         "POST /offline-sync"
       ]
     });

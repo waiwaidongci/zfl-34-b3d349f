@@ -35,9 +35,9 @@
     {
       "ringNo": "SB-26002",
       "batchId": "BATCH-2026-SPRING-001",
-      "status": "reserved",
-      "allocatedTo": null,
-      "allocatedAt": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26002",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
       "reservedBy": "FS-2026-0503-001",
       "reservedAt": "2026-06-20T17:24:03.510Z",
       "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
@@ -148,6 +148,76 @@
       "status": "available",
       "allocatedTo": null,
       "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26005",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26005",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26006",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26006",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26008",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26008",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26010",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26010",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26020",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26020",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26021",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26021",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-26022",
+      "batchId": null,
+      "status": "allocated",
+      "allocatedTo": "SB-26022",
+      "allocatedAt": "2026-06-21T05:00:42.373Z",
       "reservedBy": null,
       "reservedAt": null,
       "reservedExpiresAt": null
