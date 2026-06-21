@@ -483,6 +483,7 @@ async function commitImport(taskId, options = {}) {
         rs.error = "duplicate_in_batch_processed";
         task.commitState.skippedCount++;
         task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "duplicate_in_batch_processed" });
+        task.commitState.processedCount++;
         continue;
       }
 
@@ -491,6 +492,7 @@ async function commitImport(taskId, options = {}) {
         rs.error = "duplicate_in_db";
         task.commitState.skippedCount++;
         task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "duplicate_in_db" });
+        task.commitState.processedCount++;
         continue;
       }
       if (!rec.ringNo || !rec.species) {
@@ -498,6 +500,7 @@ async function commitImport(taskId, options = {}) {
         rs.error = "missing_required_field";
         task.commitState.skippedCount++;
         task.commitState.skippedDetails.push({ ringNo: rec.ringNo || "(missing)", reason: "missing_required_field" });
+        task.commitState.processedCount++;
         continue;
       }
 
@@ -508,6 +511,7 @@ async function commitImport(taskId, options = {}) {
         rs.invalidFields = ["species"];
         task.commitState.skippedCount++;
         task.commitState.skippedDetails.push({ ringNo: rec.ringNo, reason: "dictionary_validation_failed", invalidFields: ["species"] });
+        task.commitState.processedCount++;
         continue;
       }
 
