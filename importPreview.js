@@ -390,9 +390,9 @@ function buildBirdAndEvents(rec) {
     ringNo: rec.ringNo,
     species: rec.species,
     sex: rec.sex || "unknown",
-    age: rec.age || null,
-    capturePlace: rec.capturePlace || null,
-    season: rec.season || null,
+    age: rec.age,
+    capturePlace: rec.capturePlace,
+    season: rec.season,
     fieldSessionId: rec.fieldSessionId || null
   };
 
