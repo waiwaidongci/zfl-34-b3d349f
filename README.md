@@ -1691,10 +1691,353 @@ curl -s http://localhost:3034/backups/snapshots/<SNAPSHOT_ID> | python3 -m json.
 curl -s -X POST http://localhost:3034/backups/snapshots | python3 -m json.tool
 
 # 步骤2：执行恢复（替换 <SNAPSHOT_ID>）
-curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m json.tool
-
+curl -s -X POST http://localhost:3034/backups/snapshots/<SNAPSHOT_ID>/restore | python3 -m ```bash
 # 步骤3：验证恢复后数据可正常读取
 curl -s http://localhost:3034/birds | python3 -m json.tool
 curl -s http://localhost:3034/reports/recapture-rate | python3 -m json.tool
 curl -s http://localhost:3034/health-risk/report | python3 -m json.tool
 ```
+
+---
+
+## 数据目录隔离与本地验证机制
+
+### 核心设计
+
+系统支持通过 `DATA_DIR` 环境变量动态切换数据存储目录，实现**完全隔离**的开发、测试和验证环境。所有数据组件（原子写入、imports任务、snapshots索引、auditLogs、offlineSyncTracker）都会自动跟随指定目录工作。
+
+**设计特点：**
+- ✅ **零侵入真实数据**：测试和开发操作不会触碰默认的 `data/` 目录
+- ✅ **全组件跟随**：所有服务模块自动使用动态路径，无需修改代码
+- ✅ **原子写入保护**：隔离目录同样具备「临时文件 → rename」防半写机制
+- ✅ **环境即删即建**：测试目录可随时删除重建，不影响生产数据
+
+### 目录结构（隔离模式）
+
+当使用 `DATA_DIR=test-data` 时，完整的隔离目录结构：
+
+```
+test-data/
+├── birds.json              # 鸟类主档案
+├── events.json             # 事件子记录
+├── reports.json            # 报表缓存
+├── dictionaries.json       # 字典数据
+├── fieldSessions.json      # 野外作业场次
+├── ringInventory.json      # 环号库存
+├── auditLogs.json          # 审计日志
+├── offlineSyncTracker.json # 离线同步跟踪器
+├── seabirds.json           # 旧格式迁移文件（可选）
+├── imports/                # 导入任务目录
+│   ├── index.json          # 导入任务索引
+│   └── IMP-XXX-XXX.json    # 单个导入任务文件
+└── snapshots/              # 快照目录
+    ├── index.json          # 快照索引
+    └── SNAP-XXX-XXX.json   # 单个快照文件
+```
+
+### 环境变量配置
+
+```bash
+# 使用相对路径（相对于项目根目录）
+export DATA_DIR=test-data
+
+# 使用绝对路径
+export DATA_DIR=/tmp/my-isolated-data
+
+# 使用临时目录（每次运行都是全新环境）
+export DATA_DIR=$(mktemp -d)
+```
+
+**未设置时**：默认使用 `data/` 目录（生产/默认模式）。
+
+### NPM 脚本速查
+
+| 命令 | 说明 | DATA_DIR 默认值 |
+|------|------|----------------|
+| `npm start` | 启动服务（默认模式） | `data` |
+| `npm run start:test` | 启动服务（测试模式） | `test-data` |
+| `npm run start:isolated` | 启动服务（自定义隔离目录） | `${DATA_DIR:-isolated-data}` |
+| `npm test` | 运行所有测试 | - |
+| `npm run test:verify` | 运行测试（自动使用临时目录） | `$(mktemp -d)` |
+| `npm run verify:consistency` | 执行一致性检查 | `${DATA_DIR:-data}` |
+| `npm run data:init` | 初始化数据目录 | `${DATA_DIR:-data}` |
+| `npm run data:reset` | 重置（删除并重建）数据目录 | `${DATA_DIR:-data}` |
+| `npm run data:snapshot:create` | 创建快照 | `${DATA_DIR:-data}` |
+| `npm run data:snapshot:list` | 列出快照 | `${DATA_DIR:-data}` |
+| `npm run data:snapshot:restore <id>` | 恢复快照 | `${DATA_DIR:-data}` |
+| `npm run import:preview <file>` | 导入预览 | `${DATA_DIR:-data}` |
+| `npm run import:commit <taskId>` | 导入提交 | `${DATA_DIR:-data}` |
+
+### 本地验证完整流程
+
+#### 场景 A：不触碰真实数据的完整功能验证
+
+```bash
+# 1. 使用临时目录启动服务（关闭终端自动清理）
+DATA_DIR=$(mktemp -d) npm start
+
+# 2. 在另一个终端验证服务正常
+curl -s http://localhost:3034/ | python3 -m json.tool
+
+# 3. 验证数据目录隔离（真实 data/ 目录未被修改）
+ls -la data/          # 真实数据未变动
+ls -la /tmp/tmp.xxx/  # 临时目录包含新创建的数据文件
+
+# 4. 执行完整功能测试
+# 创建作业场次
+curl -s -X POST http://localhost:3034/field-sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"date":"2026-06-20","season":"2026春","capturePlace":"西礁C区"}' \
+  | python3 -m json.tool
+
+# 创建鸟档案
+curl -s -X POST http://localhost:3034/birds \
+  -H 'Content-Type: application/json' \
+  -d '{"ringNo":"TEST-001","species":"黑尾鸥","sex":"male","capturePlace":"西礁C区","season":"2026春"}' \
+  | python3 -m json.tool
+
+# 验证查询
+curl -s http://localhost:3034/birds | python3 -c "import sys,json; d=json.load(sys.stdin); print('鸟数:', len(d))"
+
+# 5. 关闭服务后，临时目录随系统自动清理
+# 真实 data/ 目录完全未受影响
+```
+
+#### 场景 B：持久化测试数据目录
+
+```bash
+# 1. 使用命名测试目录
+npm run start:test
+# 或
+DATA_DIR=test-data npm start
+
+# 2. 数据持久化保存在 test-data/ 目录
+ls -la test-data/
+
+# 3. 重置测试数据（清空并重新初始化）
+npm run data:reset
+# 或指定目录重置
+DATA_DIR=my-test-data npm run data:reset
+
+# 4. 完全清理测试数据
+rm -rf test-data/
+```
+
+#### 场景 C：导入功能验证
+
+```bash
+# 1. 准备测试导入数据
+cat > /tmp/test-import.json << 'EOF'
+{
+  "records": [
+    {
+      "ringNo": "IMP-TEST-001",
+      "species": "黑尾鸥",
+      "sex": "female",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "measurements": [{"wing": 320, "weight": 500, "bill": 42}]
+    },
+    {
+      "ringNo": "IMP-TEST-002",
+      "species": "红嘴鸥",
+      "sex": "male",
+      "age": "subadult",
+      "capturePlace": "东礁B区",
+      "season": "2026春"
+    }
+  ]
+}
+EOF
+
+# 2. 在隔离目录中执行导入预览
+DATA_DIR=test-data npm run import:preview /tmp/test-import.json
+
+# 3. 确认无误后提交导入（替换 <TASK_ID>）
+DATA_DIR=test-data npm run import:commit <TASK_ID>
+
+# 4. 验证导入结果
+curl -s http://localhost:3034/birds | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+ringNos = [b['ringNo'] for b in d]
+print('总鸟数:', len(d))
+print('包含测试环号:', 'IMP-TEST-001' in ringNos, 'IMP-TEST-002' in ringNos)
+"
+```
+
+#### 场景 D：快照备份恢复验证
+
+```bash
+# 1. 使用隔离目录并创建测试数据
+DATA_DIR=snapshot-test npm start
+
+# 2. 创建一些测试数据（鸟档案、作业场次等）
+# ... 使用 curl 创建数据 ...
+
+# 3. 创建快照
+DATA_DIR=snapshot-test npm run data:snapshot:create
+
+# 4. 列出快照
+DATA_DIR=snapshot-test npm run data:snapshot:list
+
+# 5. 修改数据（模拟误操作）
+curl -s -X POST http://localhost:3034/birds \
+  -H 'Content-Type: application/json' \
+  -d '{"ringNo":"TO-DELETE","species":"黑尾鸥","capturePlace":"东礁A区","season":"2026春"}'
+
+# 6. 恢复到之前的快照（替换 <SNAPSHOT_ID>）
+DATA_DIR=snapshot-test npm run data:snapshot:restore <SNAPSHOT_ID>
+
+# 7. 验证数据已恢复，TO-DELETE 鸟已不存在
+curl -s http://localhost:3034/birds/TO-DELETE/history -o /dev/null -w "HTTP状态: %{http_code}\n"
+# 预期：HTTP 404
+```
+
+#### 场景 E：一致性检查验证
+
+```bash
+# 1. 检查默认 data 目录的一致性
+npm run verify:consistency
+
+# 2. 检查隔离目录的一致性
+DATA_DIR=test-data npm run verify:consistency
+
+# 3. 预期输出包含：
+# - isConsistent: true/false
+# - repairable: 可自动修复的问题列表
+# - nonRepairable: 无法自动修复的问题列表
+```
+
+#### 场景 F：离线同步验证
+
+```bash
+# 1. 使用隔离目录启动服务
+DATA_DIR=offline-test npm start
+
+# 2. 提交离线同步包
+curl -s -X POST http://localhost:3034/offline-sync \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "packetId": "TEST-PACKET-001",
+    "fieldSessions": [
+      {
+        "tempId": "session-1",
+        "date": "2026-06-20",
+        "season": "2026春",
+        "capturePlace": "东礁A区",
+        "team": ["测试员"],
+        "capturedCount": 1,
+        "releasedCount": 1
+      }
+    ],
+    "birds": [
+      {
+        "tempId": "bird-1",
+        "ringNo": "OFFLINE-001",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "fieldSessionId": "session-1",
+        "measurements": [{"at": "2026-06-20T08:00:00.000Z", "wing": 325, "weight": 510}]
+      }
+    ]
+  }' | python3 -m json.tool
+
+# 3. 验证离线同步跟踪器记录
+python3 -c "
+import json
+d = json.load(open('offline-test/offlineSyncTracker.json'))
+print('已处理包数:', len(d['processedPackets']))
+print('包含测试包:', any(p['packetId'] == 'TEST-PACKET-001' for p in d['processedPackets']))
+"
+
+# 4. 验证幂等性（重复提交同一包）
+curl -s -X POST http://localhost:3034/offline-sync \
+  -H 'Content-Type: application/json' \
+  -d '{"packetId": "TEST-PACKET-001", "birds": []}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('幂等标记:', d.get('idempotent'))"
+# 预期：idempotent: true
+```
+
+#### 场景 G：审计日志验证
+
+```bash
+# 1. 使用隔离目录
+DATA_DIR=audit-test npm start
+
+# 2. 执行一些操作（创建鸟、修改鸟等）
+curl -s -X POST http://localhost:3034/birds \
+  -H 'Content-Type: application/json' \
+  -d '{"ringNo":"AUDIT-001","species":"黑尾鸥","capturePlace":"东礁A区","season":"2026春"}'
+
+# 3. 检查审计日志
+python3 -c "
+import json
+d = json.load(open('audit-test/auditLogs.json'))
+print('审计日志总数:', len(d['logs']))
+print('操作类型:', set(log['operationType'] for log in d['logs']))
+for log in d['logs']:
+    print(f\"  {log['createdAt'][:19]} {log['operationType']} {log['targetType']}={log.get('targetId','')}\")
+"
+```
+
+### 测试隔离最佳实践
+
+1. **CI/CD 环境**：使用 `npm run test:verify`，每次运行都在独立临时目录中执行
+
+2. **多人协作**：每人使用独立的隔离目录，避免数据冲突
+   ```bash
+   export DATA_DIR="dev-$(whoami)"
+   npm start
+   ```
+
+3. **功能回归测试**：
+   ```bash
+   # 每次测试前重置数据
+   DATA_DIR=regression-test npm run data:reset
+   
+   # 执行回归测试脚本
+   ./scripts/regression-test.sh
+   
+   # 验证通过后清理
+   rm -rf regression-test
+   ```
+
+4. **数据迁移测试**：
+   ```bash
+   # 复制真实数据到测试目录（用于迁移测试）
+   mkdir -p migration-test
+   cp data/seabirds.json migration-test/
+   
+   # 在隔离目录中测试迁移
+   DATA_DIR=migration-test npm start
+   
+   # 验证迁移结果，不影响真实数据
+   ```
+
+### 验证脚本
+
+项目自带 `scripts/verify-isolation.sh` 端到端验证脚本，执行完整的隔离机制测试：
+
+```bash
+# 执行完整的隔离验证
+bash scripts/verify-isolation.sh
+
+# 预期输出：
+# [PASS] 数据目录隔离测试
+# [PASS] 原子写入测试
+# [PASS] 导入任务隔离测试
+# [PASS] 快照隔离测试
+# [PASS] 审计日志隔离测试
+# [PASS] 离线同步隔离测试
+# [PASS] 一致性检查测试
+# [PASS] 真实数据未受影响
+```
+
+---
+
+## 错误码说明

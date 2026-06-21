@@ -14,7 +14,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:46.608Z",
         "latestMeasurement": {
           "at": "2026-05-03",
           "wing": 328,
@@ -38,7 +38,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "wing": 325,
           "weight": 505,
@@ -62,7 +62,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "wing": 280,
           "weight": 320,
@@ -92,7 +92,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": null
       }
     },
@@ -110,7 +110,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "at": "2026-06-20",
           "wing": 330,
@@ -134,7 +134,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "at": "2026-06-18",
           "wing": 310,
@@ -164,7 +164,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": null
       }
     },
@@ -182,7 +182,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "at": "2026-06-20",
           "wing": 325,
@@ -211,7 +211,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": null
       }
     },
@@ -235,7 +235,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": null
       }
     },
@@ -259,7 +259,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": null
       }
     },
@@ -286,7 +286,7 @@
             ]
           }
         ],
-        "calculatedAt": "2026-06-21T05:35:49.976Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "at": "2026-06-21",
           "wing": 320,
@@ -318,7 +318,7 @@
             ]
           }
         ],
-        "calculatedAt": "2026-06-21T05:36:03.695Z",
+        "calculatedAt": "2026-06-21T06:25:39.331Z",
         "latestMeasurement": {
           "at": "2026-06-21",
           "wing": 315,

@@ -1,24 +1,60 @@
 import { mkdir, readFile, writeFile, rename, unlink, glob, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.DATA_DIR || join(__dirname, "data");
-
-const STORE_FILES = {
-  birds: join(DATA_DIR, "birds.json"),
-  events: join(DATA_DIR, "events.json"),
-  reports: join(DATA_DIR, "reports.json"),
-  dictionaries: join(DATA_DIR, "dictionaries.json"),
-  fieldSessions: join(DATA_DIR, "fieldSessions.json"),
-  ringInventory: join(DATA_DIR, "ringInventory.json"),
-  auditLogs: join(DATA_DIR, "auditLogs.json"),
-  offlineSyncTracker: join(DATA_DIR, "offlineSyncTracker.json"),
-  legacySeabirds: join(DATA_DIR, "seabirds.json")
-};
 
 const STORE_ORDER = ["birds", "events", "reports", "dictionaries", "fieldSessions", "ringInventory", "auditLogs", "offlineSyncTracker"];
+
+function getDataDir() {
+  const envDir = process.env.DATA_DIR;
+  if (envDir) {
+    return resolve(__dirname, envDir);
+  }
+  return join(__dirname, "data");
+}
+
+function getStoreFiles() {
+  const DATA_DIR = getDataDir();
+  return {
+    birds: join(DATA_DIR, "birds.json"),
+    events: join(DATA_DIR, "events.json"),
+    reports: join(DATA_DIR, "reports.json"),
+    dictionaries: join(DATA_DIR, "dictionaries.json"),
+    fieldSessions: join(DATA_DIR, "fieldSessions.json"),
+    ringInventory: join(DATA_DIR, "ringInventory.json"),
+    auditLogs: join(DATA_DIR, "auditLogs.json"),
+    offlineSyncTracker: join(DATA_DIR, "offlineSyncTracker.json"),
+    legacySeabirds: join(DATA_DIR, "seabirds.json")
+  };
+}
+
+function getImportsDir() {
+  return join(getDataDir(), "imports");
+}
+
+function getImportsIndexPath() {
+  return join(getImportsDir(), "index.json");
+}
+
+function getTaskFilePath(taskId) {
+  return join(getImportsDir(), `${taskId}.json`);
+}
+
+function getSnapshotsDir() {
+  return join(getDataDir(), "snapshots");
+}
+
+function getSnapshotsIndexPath() {
+  return join(getSnapshotsDir(), "index.json");
+}
+
+function getSnapshotFilePath(fileName) {
+  return join(getSnapshotsDir(), fileName);
+}
+
+const STORE_FILES = getStoreFiles();
 const EVENT_TYPES = ["measurements", "releases", "recaptures", "observations"];
 
 function nowIso() {
@@ -170,8 +206,23 @@ let migrationState = {
 };
 
 async function ensureDataDir() {
+  const DATA_DIR = getDataDir();
   if (!existsSync(DATA_DIR)) {
     await mkdir(DATA_DIR, { recursive: true });
+  }
+}
+
+async function ensureImportsDir() {
+  const importsDir = getImportsDir();
+  if (!existsSync(importsDir)) {
+    await mkdir(importsDir, { recursive: true });
+  }
+}
+
+async function ensureSnapshotsDir() {
+  const snapshotsDir = getSnapshotsDir();
+  if (!existsSync(snapshotsDir)) {
+    await mkdir(snapshotsDir, { recursive: true });
   }
 }
 
@@ -179,6 +230,7 @@ const inFlightTempPaths = new Set();
 
 async function cleanupOrphanTempFiles() {
   try {
+    const DATA_DIR = getDataDir();
     const tempPattern = join(DATA_DIR, "*.tmp.*");
     const tempFiles = [];
     for await (const entry of glob(tempPattern)) {
@@ -333,8 +385,9 @@ async function verifyAndRepairConsistency() {
   };
 
   try {
-    const birdsStore = await readJsonSafely(STORE_FILES.birds, null);
-    const eventsStore = await readJsonSafely(STORE_FILES.events, null);
+    const storeFiles = getStoreFiles();
+    const birdsStore = await readJsonSafely(storeFiles.birds, null);
+    const eventsStore = await readJsonSafely(storeFiles.events, null);
 
     if (!birdsStore || !eventsStore) {
       result.issues.push("store_files_missing");
@@ -397,13 +450,14 @@ async function verifyAndRepairConsistency() {
 }
 
 async function performMigration() {
-  const legacyPath = STORE_FILES.legacySeabirds;
+  const storeFiles = getStoreFiles();
+  const legacyPath = storeFiles.legacySeabirds;
   const legacyExists = existsSync(legacyPath);
   migrationState.legacyFilePresent = legacyExists;
 
   const missingStores = [];
   for (const storeName of STORE_ORDER) {
-    if (!existsSync(STORE_FILES[storeName])) {
+    if (!existsSync(storeFiles[storeName])) {
       missingStores.push(storeName);
     }
   }
@@ -430,13 +484,13 @@ async function performMigration() {
     }
 
     if (missingStores.includes("birds")) {
-      writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
+      writeBatch.push([storeFiles.birds, { birds: newBirds }]);
     }
     if (missingStores.includes("events")) {
-      writeBatch.push([STORE_FILES.events, { events: newEvents }]);
+      writeBatch.push([storeFiles.events, { events: newEvents }]);
     }
     if (missingStores.includes("reports")) {
-      writeBatch.push([STORE_FILES.reports, JSON.parse(JSON.stringify(SEED_DATA.reports))]);
+      writeBatch.push([storeFiles.reports, JSON.parse(JSON.stringify(SEED_DATA.reports))]);
     }
     for (const storeName of missingStores) {
       if (storeName !== "birds" && storeName !== "events" && storeName !== "reports") {
@@ -444,7 +498,7 @@ async function performMigration() {
         const data = seedData !== undefined
           ? JSON.parse(JSON.stringify(seedData))
           : defaultForStore(storeName);
-        writeBatch.push([STORE_FILES[storeName], data]);
+        writeBatch.push([storeFiles[storeName], data]);
       }
     }
 
@@ -461,11 +515,11 @@ async function performMigration() {
       const data = seedData !== undefined
         ? JSON.parse(JSON.stringify(seedData))
         : defaultForStore(storeName);
-      writeBatch.push([STORE_FILES[storeName], data]);
+      writeBatch.push([storeFiles[storeName], data]);
     }
   }
 
-  const dictSeedIdx = writeBatch.findIndex(([p]) => p === STORE_FILES.dictionaries);
+  const dictSeedIdx = writeBatch.findIndex(([p]) => p === storeFiles.dictionaries);
   if (dictSeedIdx !== -1 && legacyExists) {
     const legacy = await readJsonSafely(legacyPath, { birds: [] });
     const existingValues = { species: new Set(), capturePlace: new Set(), season: new Set() };
@@ -511,27 +565,33 @@ function getMigrationState() {
 }
 
 async function readBirdsStore() {
-  return await readJsonSafely(STORE_FILES.birds, { birds: [] });
+  const storeFiles = getStoreFiles();
+  return await readJsonSafely(storeFiles.birds, { birds: [] });
 }
 
 async function readEventsStore() {
-  return await readJsonSafely(STORE_FILES.events, { events: [] });
+  const storeFiles = getStoreFiles();
+  return await readJsonSafely(storeFiles.events, { events: [] });
 }
 
 async function readReportsStore() {
-  return await readJsonSafely(STORE_FILES.reports, { reports: {} });
+  const storeFiles = getStoreFiles();
+  return await readJsonSafely(storeFiles.reports, { reports: {} });
 }
 
 async function writeBirdsStore(data) {
-  await atomicWriteFile(STORE_FILES.birds, data);
+  const storeFiles = getStoreFiles();
+  await atomicWriteFile(storeFiles.birds, data);
 }
 
 async function writeEventsStore(data) {
-  await atomicWriteFile(STORE_FILES.events, data);
+  const storeFiles = getStoreFiles();
+  await atomicWriteFile(storeFiles.events, data);
 }
 
 async function writeReportsStore(data) {
-  await atomicWriteFile(STORE_FILES.reports, data);
+  const storeFiles = getStoreFiles();
+  await atomicWriteFile(storeFiles.reports, data);
 }
 
 async function loadLegacyCompatibleDb() {
@@ -547,6 +607,7 @@ async function loadLegacyCompatibleDb() {
 }
 
 async function saveLegacyCompatibleDb(db) {
+  const storeFiles = getStoreFiles();
   const legacyBirds = db.birds || [];
 
   const newBirds = [];
@@ -558,15 +619,16 @@ async function saveLegacyCompatibleDb(db) {
   }
 
   await atomicWriteMulti([
-    [STORE_FILES.birds, { birds: newBirds }],
-    [STORE_FILES.events, { events: newEvents }]
+    [storeFiles.birds, { birds: newBirds }],
+    [storeFiles.events, { events: newEvents }]
   ]);
 }
 
 async function writeBirdsAndEventsStore(birdsData, eventsData) {
+  const storeFiles = getStoreFiles();
   await atomicWriteMulti([
-    [STORE_FILES.birds, birdsData],
-    [STORE_FILES.events, eventsData]
+    [storeFiles.birds, birdsData],
+    [storeFiles.events, eventsData]
   ]);
 }
 
@@ -594,13 +656,15 @@ function groupEventsByRing(events) {
 }
 
 async function readStore(storeName) {
-  const path = STORE_FILES[storeName];
+  const storeFiles = getStoreFiles();
+  const path = storeFiles[storeName];
   if (!path) throw new Error(`unknown_store: ${storeName}`);
   return await readJsonSafely(path, defaultForStore(storeName));
 }
 
 async function writeStore(storeName, data) {
-  const path = STORE_FILES[storeName];
+  const storeFiles = getStoreFiles();
+  const path = storeFiles[storeName];
   if (!path) throw new Error(`unknown_store: ${storeName}`);
   await atomicWriteFile(path, data);
 }
@@ -624,7 +688,17 @@ export {
   STORE_ORDER,
   EVENT_TYPES,
   SEED_DATA,
-  DATA_DIR,
+  getDataDir,
+  getStoreFiles,
+  getImportsDir,
+  getImportsIndexPath,
+  getTaskFilePath,
+  getSnapshotsDir,
+  getSnapshotsIndexPath,
+  getSnapshotFilePath,
+  ensureDataDir,
+  ensureImportsDir,
+  ensureSnapshotsDir,
   initialize,
   getMigrationState,
   loadLegacyCompatibleDb,

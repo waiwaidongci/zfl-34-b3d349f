@@ -2021,6 +2021,95 @@
           "healthRiskLevel": "medium"
         }
       ]
+    },
+    {
+      "id": "LOG-MQNEKEF8-33aa96a9",
+      "timestamp": "2026-06-21T06:25:39.332Z",
+      "operationType": "all_health_risk_recalculate",
+      "targetType": "system",
+      "targetId": "system",
+      "requestSummary": {
+        "recalculatedCount": 13,
+        "changedCount": 0
+      },
+      "before": {
+        "total": 13,
+        "byLevel": {
+          "low": 6,
+          "medium": 2,
+          "high": 5,
+          "critical": 0
+        }
+      },
+      "after": {
+        "total": 13,
+        "byLevel": {
+          "low": 6,
+          "medium": 2,
+          "high": 5,
+          "critical": 0
+        }
+      },
+      "levelChanges": []
+    },
+    {
+      "id": "LOG-MQNEKK1C-38779282",
+      "timestamp": "2026-06-21T06:25:46.608Z",
+      "operationType": "bird_health_risk_update",
+      "targetType": "bird",
+      "targetId": "SB-26001",
+      "requestSummary": {
+        "action": "recalculate_health_risk_explicit",
+        "levelChanged": false,
+        "previousLevel": "low",
+        "newLevel": "low"
+      },
+      "before": {
+        "bird": {
+          "ringNo": "SB-26001",
+          "species": "黑尾鸥",
+          "sex": "unknown",
+          "age": "adult",
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": "FS-2026-0503-001",
+          "measurementsCount": 1,
+          "recapturesCount": 1,
+          "observationsCount": 2,
+          "releasesCount": 1,
+          "healthRiskLevel": "low"
+        },
+        "healthRisk": {
+          "level": "low",
+          "score": 0,
+          "factorCount": 0,
+          "topFactors": [],
+          "calculatedAt": "2026-06-21T06:25:39.331Z"
+        }
+      },
+      "after": {
+        "bird": {
+          "ringNo": "SB-26001",
+          "species": "黑尾鸥",
+          "sex": "unknown",
+          "age": "adult",
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": "FS-2026-0503-001",
+          "measurementsCount": 1,
+          "recapturesCount": 1,
+          "observationsCount": 2,
+          "releasesCount": 1,
+          "healthRiskLevel": "low"
+        },
+        "healthRisk": {
+          "level": "low",
+          "score": 0,
+          "factorCount": 0,
+          "topFactors": [],
+          "calculatedAt": "2026-06-21T06:25:46.608Z"
+        }
+      }
     }
   ]
 }

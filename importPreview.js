@@ -14,7 +14,10 @@ import {
   atomicWriteFile,
   atomicWriteMulti,
   STORE_FILES,
-  DATA_DIR
+  getImportsDir,
+  getImportsIndexPath,
+  getTaskFilePath,
+  ensureImportsDir
 } from "./dataStore.js";
 import { getRingStatus, syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
@@ -27,8 +30,6 @@ import {
 } from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const IMPORTS_DIR = join(DATA_DIR, "imports");
-const INDEX_PATH = join(IMPORTS_DIR, "index.json");
 
 const KNOWN_SPECIES = new Set([
   "黑尾鸥", "黑嘴鸥", "遗鸥", "红嘴鸥", "普通燕鸥",
@@ -49,22 +50,13 @@ const TASK_STATUS = {
   EXPIRED: "expired"
 };
 
-async function ensureImportsDir() {
-  if (!existsSync(IMPORTS_DIR)) {
-    await mkdir(IMPORTS_DIR, { recursive: true });
-  }
-}
-
 function generateTaskId() {
   return `IMP-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`;
 }
 
-function taskFilePath(taskId) {
-  return join(IMPORTS_DIR, `${taskId}.json`);
-}
-
 async function loadIndex() {
   await ensureImportsDir();
+  const INDEX_PATH = getImportsIndexPath();
   if (!existsSync(INDEX_PATH)) {
     const defaultIndex = { tasks: [] };
     await atomicWriteFile(INDEX_PATH, defaultIndex);
@@ -79,6 +71,7 @@ async function loadIndex() {
 
 async function saveIndex(index) {
   await ensureImportsDir();
+  const INDEX_PATH = getImportsIndexPath();
   await atomicWriteFile(INDEX_PATH, index);
 }
 
@@ -97,7 +90,7 @@ async function cleanupExpired() {
   if (toDelete.length > 0) {
     for (const taskId of toDelete) {
       try {
-        const fp = taskFilePath(taskId);
+        const fp = getTaskFilePath(taskId);
         if (existsSync(fp)) await unlink(fp);
       } catch (_) {}
     }
@@ -115,7 +108,7 @@ function isTaskExpired(task) {
 
 async function loadTask(taskId) {
   await cleanupExpired();
-  const fp = taskFilePath(taskId);
+  const fp = getTaskFilePath(taskId);
   if (!existsSync(fp)) return null;
   try {
     const task = JSON.parse(await readFile(fp, "utf8"));
@@ -138,7 +131,7 @@ async function loadTask(taskId) {
 
 async function saveTask(task) {
   await ensureImportsDir();
-  const fp = taskFilePath(task.taskId);
+  const fp = getTaskFilePath(task.taskId);
   await atomicWriteFile(fp, task);
   const index = await loadIndex();
   const existingIdx = index.tasks.findIndex(t => t.taskId === task.taskId);

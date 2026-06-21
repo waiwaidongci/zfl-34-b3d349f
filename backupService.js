@@ -14,7 +14,11 @@ import {
   writeStore,
   atomicWriteMulti,
   splitLegacyBirdToEvents,
-  DATA_DIR
+  getSnapshotsDir,
+  getSnapshotsIndexPath,
+  getSnapshotFilePath,
+  ensureSnapshotsDir,
+  getStoreFiles
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -28,18 +32,10 @@ import {
 } from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = STORE_FILES.legacySeabirds;
-const snapshotsDir = join(DATA_DIR, "snapshots");
-const indexPath = join(snapshotsDir, "index.json");
-
-async function ensureSnapshotsDir() {
-  if (!existsSync(snapshotsDir)) {
-    await mkdir(snapshotsDir, { recursive: true });
-  }
-}
 
 async function loadIndex() {
   await ensureSnapshotsDir();
+  const indexPath = getSnapshotsIndexPath();
   if (!existsSync(indexPath)) {
     await atomicWriteFile(indexPath, { snapshots: [] });
     return { snapshots: [] };
@@ -53,6 +49,7 @@ async function loadIndex() {
 
 async function saveIndex(data) {
   await ensureSnapshotsDir();
+  const indexPath = getSnapshotsIndexPath();
   await atomicWriteFile(indexPath, data);
 }
 
@@ -125,6 +122,8 @@ export async function createSnapshot() {
   await initialize();
   const allStores = await loadAllStores();
   const legacyDb = await loadLegacyCompatibleDb();
+  const storeFiles = getStoreFiles();
+  const dbPath = storeFiles.legacySeabirds;
 
   const db = {
     ...allStores,
@@ -144,7 +143,7 @@ export async function createSnapshot() {
 
   const snapshotId = generateSnapshotId();
   const snapshotFileName = `${snapshotId}.json`;
-  const snapshotFilePath = join(snapshotsDir, snapshotFileName);
+  const snapshotFilePath = getSnapshotFilePath(snapshotFileName);
 
   const snapshotData = {
     _meta: {
@@ -203,7 +202,7 @@ export async function getSnapshotSummary(snapshotId) {
   const entry = index.snapshots.find(s => s.snapshotId === snapshotId);
   if (!entry) return null;
 
-  const snapshotFilePath = join(snapshotsDir, entry.fileName);
+  const snapshotFilePath = getSnapshotFilePath(entry.fileName);
   if (!existsSync(snapshotFilePath)) return null;
 
   const raw = await readFile(snapshotFilePath, "utf8");
@@ -489,6 +488,7 @@ async function computeDiff(snapshotDb) {
 }
 
 async function saveAllStores(db) {
+  const storeFiles = getStoreFiles();
   const writeBatch = [];
   if (db.birds !== undefined) {
     const newBirds = [];
@@ -498,17 +498,17 @@ async function saveAllStores(db) {
       newBirds.push(bird);
       newEvents.push(...events);
     }
-    writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
-    writeBatch.push([STORE_FILES.events, { events: newEvents }]);
+    writeBatch.push([storeFiles.birds, { birds: newBirds }]);
+    writeBatch.push([storeFiles.events, { events: newEvents }]);
   }
   if (db.dictionaries !== undefined) {
-    writeBatch.push([STORE_FILES.dictionaries, db.dictionaries]);
+    writeBatch.push([storeFiles.dictionaries, db.dictionaries]);
   }
   if (db.fieldSessions !== undefined) {
-    writeBatch.push([STORE_FILES.fieldSessions, { fieldSessions: db.fieldSessions }]);
+    writeBatch.push([storeFiles.fieldSessions, { fieldSessions: db.fieldSessions }]);
   }
   if (db.ringInventory !== undefined) {
-    writeBatch.push([STORE_FILES.ringInventory, db.ringInventory]);
+    writeBatch.push([storeFiles.ringInventory, db.ringInventory]);
   }
   await atomicWriteMulti(writeBatch);
 }
@@ -519,7 +519,7 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
   const entry = index.snapshots.find(s => s.snapshotId === snapshotId);
   if (!entry) throw new Error("snapshot_not_found");
 
-  const snapshotFilePath = join(snapshotsDir, entry.fileName);
+  const snapshotFilePath = getSnapshotFilePath(entry.fileName);
   if (!existsSync(snapshotFilePath)) throw new Error("snapshot_file_missing");
 
   const raw = await readFile(snapshotFilePath, "utf8");
@@ -947,9 +947,10 @@ export async function checkConsistency() {
     after: null
   });
 
+  const storeFiles = getStoreFiles();
   const newAuditLogs = [...db.auditLogs, checkAuditEntry];
   await atomicWriteMulti([
-    [STORE_FILES.auditLogs, { logs: newAuditLogs }]
+    [storeFiles.auditLogs, { logs: newAuditLogs }]
   ]);
 
   return result;
@@ -1169,15 +1170,16 @@ export async function repairConsistency(repairPlan) {
     }
   });
 
+  const storeFiles = getStoreFiles();
   const newAuditLogs = [...db.auditLogs, repairAuditEntry];
 
   const writeBatch = [];
-  writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
-  writeBatch.push([STORE_FILES.events, { events: newEvents }]);
-  writeBatch.push([STORE_FILES.dictionaries, newDictionaries]);
-  writeBatch.push([STORE_FILES.fieldSessions, { fieldSessions: newFieldSessions }]);
-  writeBatch.push([STORE_FILES.ringInventory, newRingInventory]);
-  writeBatch.push([STORE_FILES.auditLogs, { logs: newAuditLogs }]);
+  writeBatch.push([storeFiles.birds, { birds: newBirds }]);
+  writeBatch.push([storeFiles.events, { events: newEvents }]);
+  writeBatch.push([storeFiles.dictionaries, newDictionaries]);
+  writeBatch.push([storeFiles.fieldSessions, { fieldSessions: newFieldSessions }]);
+  writeBatch.push([storeFiles.ringInventory, newRingInventory]);
+  writeBatch.push([storeFiles.auditLogs, { logs: newAuditLogs }]);
 
   await atomicWriteMulti(writeBatch);
 

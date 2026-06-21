@@ -5,6 +5,17 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "start:test": "DATA_DIR=test-data node server.js",
+    "start:isolated": "DATA_DIR=${DATA_DIR:-isolated-data} node server.js",
+    "test": "node --test",
+    "test:verify": "DATA_DIR=$(mktemp -d) node --test",
+    "verify:consistency": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { checkConsistency } = await import('./backupService.js'); console.log(JSON.stringify(await checkConsistency(), null, 2)); })()\"",
+    "data:init": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { initialize } = await import('./dataStore.js'); await initialize(); console.log('Data directory initialized'); })()\"",
+    "data:reset": "rm -rf ${DATA_DIR:-data} && DATA_DIR=${DATA_DIR:-data} npm run data:init",
+    "data:snapshot:create": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { createSnapshot } = await import('./backupService.js'); console.log(JSON.stringify(await createSnapshot(), null, 2)); })()\"",
+    "data:snapshot:list": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { listSnapshots } = await import('./backupService.js'); console.log(JSON.stringify(await listSnapshots(), null, 2)); })()\"",
+    "data:snapshot:restore": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { restoreFromSnapshot } = await import('./backupService.js'); const snapshotId = process.argv[1]; console.log(JSON.stringify(await restoreFromSnapshot(snapshotId), null, 2)); })()\"",
+    "import:preview": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { createPreview } = await import('./importPreview.js'); const { loadLegacyCompatibleDb } = await import('./dataStore.js'); const file = process.argv[1]; const fs = await import('node:fs/promises'); const data = JSON.parse(await fs.readFile(file, 'utf8')); const legacyDb = await loadLegacyCompatibleDb(); console.log(JSON.stringify(await createPreview(data.records || data, legacyDb.birds), null, 2)); })()\"",
+    "import:commit": "DATA_DIR=${DATA_DIR:-data} node -e \"(async () => { const { commitImport } = await import('./importPreview.js'); const taskId = process.argv[1]; console.log(JSON.stringify(await commitImport(taskId), null, 2)); })()\""
   }
 }
