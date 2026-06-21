@@ -89,10 +89,20 @@ export function buildMigrationSummary(birds, { species, season } = {}) {
   });
 }
 
+function parseDateFilter(value, endOfDay = false) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
+  }
+  return new Date(value);
+}
+
 export function buildHotspotStats(birds, { species, season, dateFrom, dateTo } = {}) {
   let filteredBirds = birds;
   if (species) filteredBirds = filteredBirds.filter(b => b.species === species);
   if (season) filteredBirds = filteredBirds.filter(b => b.season === season);
+  const fromDate = parseDateFilter(dateFrom);
+  const toDate = parseDateFilter(dateTo, true);
 
   const allObservations = [];
   for (const bird of filteredBirds) {
@@ -104,12 +114,10 @@ export function buildHotspotStats(birds, { species, season, dateFrom, dateTo } =
       const obsDate = new Date(obs.at);
       if (isNaN(obsDate.getTime())) continue;
 
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
+      if (fromDate) {
         if (obsDate < fromDate) continue;
       }
-      if (dateTo) {
-        const toDate = new Date(dateTo);
+      if (toDate) {
         if (obsDate > toDate) continue;
       }
 
