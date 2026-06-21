@@ -35,12 +35,12 @@
     {
       "ringNo": "SB-26002",
       "batchId": "BATCH-2026-SPRING-001",
-      "status": "reserved",
-      "allocatedTo": null,
-      "allocatedAt": null,
-      "reservedBy": "FS-2026-0503-001",
-      "reservedAt": "2026-06-20T17:24:03.510Z",
-      "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
+      "status": "allocated",
+      "allocatedTo": "SB-26002",
+      "allocatedAt": "2026-06-20T17:25:02.071Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
     },
     {
       "ringNo": "SB-27000",

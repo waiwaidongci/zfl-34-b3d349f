@@ -28,6 +28,7 @@ function errorMap(err) {
     case "no_available_rings": return { status: 404, error: "no_available_rings", message: "没有可用的环号" };
     case "ring_reserved": return { status: 409, error: "ring_reserved", message: "环号已被预留" };
     case "ring_reserved_by_other_session": return { status: 409, error: "ring_reserved_by_other_session", message: "环号已被其他场次预留" };
+    case "ring_reservation_expired": return { status: 409, error: "ring_reservation_expired", message: "环号预留已过期，不能被占用" };
     case "ring_already_reserved": return { status: 409, error: "ring_already_reserved", message: "环号已被预留" };
     case "ring_not_reserved": return { status: 400, error: "ring_not_reserved", message: "环号未被预留，无法取消" };
     case "session_not_found": return { status: 404, error: "session_not_found", message: "作业场次不存在" };

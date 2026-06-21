@@ -742,6 +742,8 @@ curl -s http://localhost:3034/field-sessions/summary \
     "createdAt": "2026-01-15T00:00:00.000Z",
     "totalRings": 2,
     "available": 1,
+    "reserved": 0,
+    "expiredReservations": 0,
     "allocated": 1
   }
 ]
@@ -752,11 +754,16 @@ curl -s http://localhost:3034/field-sessions/summary \
 **GET /ring-inventory/rings**
 
 查询参数：
-- `status` (可选)：`available` 或 `allocated`
+- `status` (可选)：`available`、`reserved`、`expired_reserved` 或 `allocated`
 - `batchId` (可选)：按批次筛选
 - `ringNo` (可选)：按环号精确查询
 
 示例：`GET /ring-inventory/rings?status=available`
+
+说明：
+- `available` 只返回可直接分配的环号
+- `reserved` 只返回未过期预留
+- `expired_reserved` 返回已过期但仍保留预留痕迹的环号，不能直接占用
 
 响应（200）：
 ```json
@@ -766,7 +773,10 @@ curl -s http://localhost:3034/field-sessions/summary \
     "batchId": "BATCH-2026-SPRING-001",
     "status": "available",
     "allocatedTo": null,
-    "allocatedAt": null
+    "allocatedAt": null,
+    "reservedBy": null,
+    "reservedAt": null,
+    "reservedExpiresAt": null
   }
 ]
 ```
@@ -783,9 +793,12 @@ curl -s http://localhost:3034/field-sessions/summary \
 {
   "ringNo": "SB-26002",
   "batchId": "BATCH-2026-SPRING-001",
-    "status": "available",
-    "allocatedTo": null,
-    "allocatedAt": null
+  "status": "available",
+  "allocatedTo": null,
+  "allocatedAt": null,
+  "reservedBy": null,
+  "reservedAt": null,
+  "reservedExpiresAt": null
 }
 ```
 
@@ -809,7 +822,10 @@ curl -s http://localhost:3034/field-sessions/summary \
   "batchId": "BATCH-2026-SPRING-001",
   "status": "allocated",
   "allocatedTo": "环志员-张三-20260620",
-  "allocatedAt": "2026-06-20T10:30:00.000Z"
+  "allocatedAt": "2026-06-20T10:30:00.000Z",
+  "reservedBy": null,
+  "reservedAt": null,
+  "reservedExpiresAt": null
 }
 ```
 
@@ -833,7 +849,10 @@ curl -s http://localhost:3034/field-sessions/summary \
   "batchId": "BATCH-2026-SPRING-001",
   "status": "allocated",
   "allocatedTo": "环志员-李四-20260620",
-  "allocatedAt": "2026-06-20T10:35:00.000Z"
+  "allocatedAt": "2026-06-20T10:35:00.000Z",
+  "reservedBy": null,
+  "reservedAt": null,
+  "reservedExpiresAt": null
 }
 ```
 
@@ -855,9 +874,119 @@ curl -s http://localhost:3034/field-sessions/summary \
   "batchId": "BATCH-2026-SPRING-001",
   "status": "available",
   "allocatedTo": null,
-  "allocatedAt": null
+  "allocatedAt": null,
+  "reservedBy": null,
+  "reservedAt": null,
+  "reservedExpiresAt": null
 }
 ```
+
+### 8. 预留环号
+
+**POST /ring-inventory/rings/reserve**
+
+用于外业前将某个环号临时锁定给指定作业场次。预留默认有效期为 24 小时，可用 `ttlHours` 调整。
+
+请求体：
+```json
+{
+  "ringNo": "SB-26002",
+  "fieldSessionId": "FS-2026-0503-001",
+  "ttlHours": 24
+}
+```
+
+响应（200）：
+```json
+{
+  "ringNo": "SB-26002",
+  "batchId": "BATCH-2026-SPRING-001",
+  "status": "reserved",
+  "allocatedTo": null,
+  "allocatedAt": null,
+  "reservedBy": "FS-2026-0503-001",
+  "reservedAt": "2026-06-20T10:00:00.000Z",
+  "reservedExpiresAt": "2026-06-21T10:00:00.000Z"
+}
+```
+
+### 9. 取消预留
+
+**POST /ring-inventory/rings/cancel-reservation**
+
+请求体：
+```json
+{
+  "ringNo": "SB-26002"
+}
+```
+
+响应（200）：
+```json
+{
+  "ringNo": "SB-26002",
+  "batchId": "BATCH-2026-SPRING-001",
+  "status": "available",
+  "allocatedTo": null,
+  "allocatedAt": null,
+  "reservedBy": null,
+  "reservedAt": null,
+  "reservedExpiresAt": null
+}
+```
+
+### 10. 按场次查询预留环号
+
+**GET /ring-inventory/rings/reserved**
+
+查询参数：
+- `fieldSessionId` (可选)：只查询某个作业场次的预留环号
+- `includeExpired` (可选)：传 `true` 时包含过期预留
+
+示例：`GET /ring-inventory/rings/reserved?fieldSessionId=FS-2026-0503-001`
+
+响应（200）：
+```json
+[
+  {
+    "ringNo": "SB-26002",
+    "batchId": "BATCH-2026-SPRING-001",
+    "status": "reserved",
+    "allocatedTo": null,
+    "allocatedAt": null,
+    "reservedBy": "FS-2026-0503-001",
+    "reservedAt": "2026-06-20T10:00:00.000Z",
+    "reservedExpiresAt": "2026-06-21T10:00:00.000Z"
+  }
+]
+```
+
+### 11. 查询单个环号状态
+
+**GET /ring-inventory/rings/:ringNo/status**
+
+当预留已过期时，响应会保留 `status: "reserved"` 并增加 `_expiredReservation: true`，表示该环号不能继续被占用。
+
+响应（200）：
+```json
+{
+  "ringNo": "SB-26002",
+  "batchId": "BATCH-2026-SPRING-001",
+  "status": "reserved",
+  "allocatedTo": null,
+  "allocatedAt": null,
+  "reservedBy": "FS-2026-0503-001",
+  "reservedAt": "2026-06-20T10:00:00.000Z",
+  "reservedExpiresAt": "2026-06-20T11:00:00.000Z",
+  "_expiredReservation": true
+}
+```
+
+### 预留与鸟档案联动
+
+- 创建鸟档案时，只有本场次未过期预留环号可以被使用，并会自动转为 `allocated`
+- 其他场次预留、未提供场次的预留环号、已过期预留环号都会返回 409
+- 过期预留不会出现在 `available` 和下一个可用环号接口中，需要先取消预留或重新预留后再处理
 
 ---
 
@@ -871,6 +1000,12 @@ curl -s http://localhost:3034/field-sessions/summary \
 | `no_available_rings` | 404 | 没有可用环号 |
 | `ring_already_allocated` | 409 | 环号已被分配 |
 | `ring_already_used_in_birds` | 409 | 环号已在 birds 记录中使用 |
+| `ring_reserved` | 409 | 环号已被预留 |
+| `ring_reserved_by_other_session` | 409 | 环号已被其他场次预留 |
+| `ring_reservation_expired` | 409 | 环号预留已过期，不能被占用 |
+| `ring_already_reserved` | 409 | 环号已被预留 |
+| `ring_not_reserved` | 400 | 环号未被预留，无法取消 |
+| `session_not_found` | 404 | 作业场次不存在 |
 
 ---
 

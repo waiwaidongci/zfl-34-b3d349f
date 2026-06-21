@@ -8,7 +8,7 @@ import {
   reassembleBirdFromEvents
 } from "./dataStore.js";
 import { randomUUID } from "node:crypto";
-import { syncAllocateRing } from "./ringInventory.js";
+import { getRingStatus, syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
 import { validateDictionaryValue, validateDictionaryValues } from "./dictionaries.js";
 import {
@@ -301,13 +301,28 @@ async function commitImport(previewId) {
     existingRingNos.add(rec.ringNo);
   }
 
-  await writeBirdsAndEventsStore(birdsStore, eventsStore);
+  for (const bird of imported) {
+    const ring = await getRingStatus(bird.ringNo);
+    if (!ring) continue;
+    if (ring.status === "allocated") {
+      throw new Error("ring_already_allocated");
+    }
+    if (ring._expiredReservation) {
+      throw new Error("ring_reservation_expired");
+    }
+    if (ring.status === "reserved" && !bird.fieldSessionId) {
+      throw new Error("ring_reserved");
+    }
+    if (ring.status === "reserved" && ring.reservedBy !== bird.fieldSessionId) {
+      throw new Error("ring_reserved_by_other_session");
+    }
+  }
 
   for (const bird of imported) {
-    try {
-      await syncAllocateRing(bird.ringNo, bird.ringNo, { fieldSessionId: bird.fieldSessionId || null });
-    } catch (_) {}
+    await syncAllocateRing(bird.ringNo, bird.ringNo, { fieldSessionId: bird.fieldSessionId || null });
   }
+
+  await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
   preview.status = "committed";
   preview.committedAt = new Date().toISOString();
@@ -315,7 +330,7 @@ async function commitImport(previewId) {
   const importedRingNos = imported.map(b => b.ringNo);
   const fieldSessionValidationSummary = preview.validation.fieldSessionValidationSummary || null;
   const fieldSessionWarnings = preview.validation.fieldSessionWarnings || [];
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_BATCH_IMPORT,
     targetType: TARGET_TYPES.BIRD,
     targetId: previewId,

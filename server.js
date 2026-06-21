@@ -93,6 +93,8 @@ function mapBirdServiceError(e) {
       return { status: 409, error: "ring_reserved", message: e.userMessage || "该环号已被预留" };
     case "ring_reserved_by_other_session":
       return { status: 409, error: "ring_reserved_by_other_session", message: e.userMessage || "该环号已被其他场次预留" };
+    case "ring_reservation_expired":
+      return { status: 409, error: "ring_reservation_expired", message: e.userMessage || "该环号预留已过期，不能被占用" };
     case "dictionary_validation_failed":
       return {
         status: 400,
@@ -168,6 +170,10 @@ const server = http.createServer(async (req, res) => {
             case "preview_not_found": return send(res, 404, { error: "preview_not_found", message: "预览不存在或已过期" });
             case "already_committed": return send(res, 409, { error: "already_committed", message: "该预览已提交，不可重复写入" });
             case "has_blocking_errors": return send(res, 422, { error: "has_blocking_errors", message: "存在阻断性错误，请修正后重新提交预览" });
+            case "ring_reserved": return send(res, 409, { error: "ring_reserved", message: "环号已被预留" });
+            case "ring_reserved_by_other_session": return send(res, 409, { error: "ring_reserved_by_other_session", message: "环号已被其他场次预留" });
+            case "ring_reservation_expired": return send(res, 409, { error: "ring_reservation_expired", message: "环号预留已过期，不能被占用" });
+            case "ring_already_allocated": return send(res, 409, { error: "ring_already_allocated", message: "环号已被分配" });
             default: throw e;
           }
         }

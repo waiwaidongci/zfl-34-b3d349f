@@ -84,7 +84,7 @@ export async function createBatch({ prefix, startNo, endNo, season, description 
   inventory.rings.push(...newRings);
   await saveInventory(inventory);
 
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_BATCH_CREATE,
     targetType: TARGET_TYPES.RING_BATCH,
     targetId: batchId,
@@ -109,6 +109,7 @@ export async function listBatches({ season } = {}) {
       totalRings: batchRings.length,
       available: batchRings.filter(r => r.status === "available").length,
       reserved: batchRings.filter(r => r.status === "reserved" && !isRingReservationExpired(r)).length,
+      expiredReservations: batchRings.filter(r => r.status === "reserved" && isRingReservationExpired(r)).length,
       allocated: batchRings.filter(r => r.status === "allocated").length
     };
   });
@@ -119,11 +120,11 @@ export async function listRings({ status, batchId, ringNo } = {}) {
   let rings = inventory.rings;
   if (status) {
     rings = rings.filter(r => {
-      if (status === "available") {
-        return r.status === "available" || (r.status === "reserved" && isRingReservationExpired(r));
-      }
       if (status === "reserved") {
         return r.status === "reserved" && !isRingReservationExpired(r);
+      }
+      if (status === "expired_reserved") {
+        return r.status === "reserved" && isRingReservationExpired(r);
       }
       return r.status === status;
     });
@@ -135,9 +136,7 @@ export async function listRings({ status, batchId, ringNo } = {}) {
 
 export async function getNextAvailableRing(batchId) {
   const inventory = await loadInventory();
-  let rings = inventory.rings.filter(r =>
-    r.status === "available" || (r.status === "reserved" && isRingReservationExpired(r))
-  );
+  let rings = inventory.rings.filter(r => r.status === "available");
   if (batchId) rings = rings.filter(r => r.batchId === batchId);
   return rings.sort((a, b) => a.ringNo.localeCompare(b.ringNo))[0] || null;
 }
@@ -172,16 +171,18 @@ export async function allocateRing({ ringNo, allocatedTo, season, fromReserved =
     throw new Error("ring_already_allocated");
   }
   if (ring.status === "reserved" && isRingReservationExpired(ring)) {
-    ring.status = "available";
-    ring.reservedBy = null;
-    ring.reservedAt = null;
-    ring.reservedExpiresAt = null;
+    throw new Error("ring_reservation_expired");
   }
   if (ring.status === "reserved" && !fromReserved) {
     throw new Error("ring_reserved");
   }
-  if (ring.status === "reserved" && fromReserved && fieldSessionId && ring.reservedBy !== fieldSessionId) {
-    throw new Error("ring_reserved_by_other_session");
+  if (ring.status === "reserved" && fromReserved) {
+    if (!fieldSessionId) {
+      throw new Error("ring_reserved");
+    }
+    if (ring.reservedBy !== fieldSessionId) {
+      throw new Error("ring_reserved_by_other_session");
+    }
   }
 
   const beforeRing = pickRingKeyFields(ring);
@@ -193,7 +194,7 @@ export async function allocateRing({ ringNo, allocatedTo, season, fromReserved =
   ring.reservedExpiresAt = null;
 
   await saveInventory(inventory);
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_ALLOCATE,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
@@ -225,7 +226,7 @@ export async function releaseRing(ringNo) {
   ring.reservedExpiresAt = null;
 
   await saveInventory(inventory);
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_RELEASE,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
@@ -252,10 +253,7 @@ export async function syncAllocateRing(ringNo, allocatedTo, { fieldSessionId } =
     throw new Error("ring_already_allocated");
   }
   if (ring.status === "reserved" && isRingReservationExpired(ring)) {
-    ring.status = "available";
-    ring.reservedBy = null;
-    ring.reservedAt = null;
-    ring.reservedExpiresAt = null;
+    throw new Error("ring_reservation_expired");
   }
   if (ring.status === "reserved") {
     if (!fieldSessionId) {
@@ -273,7 +271,7 @@ export async function syncAllocateRing(ringNo, allocatedTo, { fieldSessionId } =
   ring.reservedAt = null;
   ring.reservedExpiresAt = null;
   await saveInventory(inventory);
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_ALLOCATE,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
@@ -296,7 +294,7 @@ export async function getRingStatus(ringNo) {
   const ring = inventory.rings.find(r => r.ringNo === ringNo);
   if (!ring) return null;
   if (ring.status === "reserved" && isRingReservationExpired(ring)) {
-    return { ...ring, status: "available", _expiredReservation: true };
+    return { ...ring, _expiredReservation: true };
   }
   return { ...ring };
 }
@@ -333,7 +331,7 @@ export async function reserveRing({ ringNo, fieldSessionId, ttlHours }) {
   ring.reservedExpiresAt = expiresAt;
 
   await saveInventory(inventory);
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_RESERVE,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,
@@ -362,7 +360,7 @@ export async function cancelReservation(ringNo) {
   ring.reservedExpiresAt = null;
 
   await saveInventory(inventory);
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.RING_CANCEL_RESERVATION,
     targetType: TARGET_TYPES.RING,
     targetId: ringNo,

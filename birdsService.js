@@ -79,6 +79,11 @@ export async function createBird(input) {
       err.userMessage = "该环号在库存中已被占用";
       throw err;
     }
+    if (ringStatus._expiredReservation) {
+      const err = new Error("ring_reservation_expired");
+      err.userMessage = "该环号预留已过期，不能被占用";
+      throw err;
+    }
     if (ringStatus.status === "reserved" && input.fieldSessionId) {
       if (ringStatus.reservedBy !== input.fieldSessionId) {
         const err = new Error("ring_reserved_by_other_session");
@@ -92,6 +97,16 @@ export async function createBird(input) {
     }
   }
 
+  const beforeBirdsStore = {
+    ...birdsStore,
+    birds: [...birdsStore.birds]
+  };
+  const eventsStore = await readEventsStore();
+  const beforeEventsStore = {
+    ...eventsStore,
+    events: [...eventsStore.events]
+  };
+
   const bird = {
     ringNo: input.ringNo,
     species: input.species,
@@ -102,7 +117,6 @@ export async function createBird(input) {
     fieldSessionId: input.fieldSessionId || null
   };
 
-  const eventsStore = await readEventsStore();
   const events = [];
   for (const type of EVENT_TYPES) {
     const arr = input[type] || (type === "measurements" ? input.measurements :
@@ -132,14 +146,14 @@ export async function createBird(input) {
   eventsStore.events.push(...events);
 
   await writeBirdsAndEventsStore(birdsStore, eventsStore);
-
   try {
     await syncAllocateRing(input.ringNo, input.ringNo, { fieldSessionId: input.fieldSessionId });
   } catch (syncErr) {
-    console.error(`[birdsService] syncAllocateRing failed for ${input.ringNo}: ${syncErr.message}`);
+    await writeBirdsAndEventsStore(beforeBirdsStore, beforeEventsStore);
+    throw syncErr;
   }
 
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_CREATE,
     targetType: TARGET_TYPES.BIRD,
     targetId: bird.ringNo,
@@ -173,7 +187,7 @@ export async function recalculateBirdHealthRisk(ringNo, explicit = false) {
 
   await writeBirdsStore(birdsStore);
 
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
     targetType: TARGET_TYPES.BIRD,
     targetId: ringNo,
@@ -249,7 +263,7 @@ export async function appendBirdEvent(ringNo, action, input) {
     releases: OPERATION_TYPES.BIRD_RELEASE_APPEND
   };
 
-  recordAuditLog({
+  await recordAuditLog({
     operationType: opTypeMap[action],
     targetType: TARGET_TYPES.BIRD,
     targetId: ringNo,
@@ -290,7 +304,7 @@ export async function recalculateAllBirdsHealthRisk() {
 
   const summary = getRiskSummary(birds);
 
-  recordAuditLog({
+  await recordAuditLog({
     operationType: OPERATION_TYPES.ALL_HEALTH_RISK_RECALCULATE,
     targetType: TARGET_TYPES.SYSTEM,
     targetId: "system",
