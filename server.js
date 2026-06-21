@@ -41,6 +41,8 @@ import {
   recalculateBirdHealthRisk,
   appendBirdEvent,
   getHealthRiskReport,
+  getHealthRiskTrendView,
+  getHealthRiskTopFactors,
   recalculateAllBirdsHealthRisk,
   getRecaptureRateReport
 } from "./birdsService.js";
@@ -341,6 +343,8 @@ const server = http.createServer(async (req, res) => {
         "POST /birds/:ringNo/observations", "POST /birds/:ringNo/releases",
         "POST /birds/:ringNo/health-risk/recalculate",
         "GET /health-risk/report",
+        "GET /health-risk/trend?season=&capturePlace=",
+        "GET /health-risk/top-factors?limit=&severity=&season=&capturePlace=",
         "POST /health-risk/recalculate-all",
         "GET /reports/recapture-rate?season=",
         "GET /reports/migration-summary?species=&season=",
@@ -425,6 +429,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/health-risk/report") {
       const summary = await getHealthRiskReport();
       return send(res, 200, summary);
+    }
+
+    if (req.method === "GET" && url.pathname === "/health-risk/trend") {
+      const season = url.searchParams.get("season");
+      const capturePlace = url.searchParams.get("capturePlace");
+      const trend = await getHealthRiskTrendView({ season, capturePlace });
+      return send(res, 200, trend);
+    }
+
+    if (req.method === "GET" && url.pathname === "/health-risk/top-factors") {
+      const limitParam = url.searchParams.get("limit");
+      const severity = url.searchParams.get("severity");
+      const season = url.searchParams.get("season");
+      const capturePlace = url.searchParams.get("capturePlace");
+      const limit = limitParam ? Number(limitParam) : undefined;
+      const topFactors = await getHealthRiskTopFactors({ limit, severity, season, capturePlace });
+      return send(res, 200, topFactors);
     }
 
     if (req.method === "POST" && url.pathname === "/health-risk/recalculate-all") {

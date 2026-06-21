@@ -14,7 +14,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-20T12:03:05.089Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": {
           "at": "2026-05-03",
           "wing": 328,
@@ -38,7 +38,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": {
           "wing": 325,
           "weight": 505,
@@ -62,7 +62,7 @@
         "level": "low",
         "score": 0,
         "factors": [],
-        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": {
           "wing": 280,
           "weight": 320,
@@ -92,7 +92,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-20T10:18:54.536Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
     },
@@ -107,17 +107,17 @@
       "healthRisk": {
         "ringNo": "SB-26010",
         "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-20T15:04:01.948Z",
-        "latestMeasurement": null
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "latestMeasurement": {
+          "at": "2026-06-20",
+          "wing": 330,
+          "weight": 520,
+          "bill": 45,
+          "fieldSessionId": "FS-2026-0503-001"
+        }
       }
     },
     {
@@ -131,17 +131,17 @@
       "healthRisk": {
         "ringNo": "SB-26020",
         "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-20T15:04:20.811Z",
-        "latestMeasurement": null
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "latestMeasurement": {
+          "at": "2026-06-18",
+          "wing": 310,
+          "weight": 450,
+          "bill": 42,
+          "fieldSessionId": "FS-2026-0618-OCZL"
+        }
       }
     },
     {
@@ -164,7 +164,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-20T15:04:20.812Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
     },
@@ -179,17 +179,16 @@
       "healthRisk": {
         "ringNo": "SB-26022",
         "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-20T15:04:43.696Z",
-        "latestMeasurement": null
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
+        "latestMeasurement": {
+          "at": "2026-06-20",
+          "wing": 325,
+          "weight": 500,
+          "bill": 43
+        }
       }
     },
     {
@@ -212,7 +211,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-20T17:25:02.068Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
     },
@@ -236,7 +235,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-20T17:29:18.663Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
     },
@@ -260,7 +259,7 @@
             "severity": "high"
           }
         ],
-        "calculatedAt": "2026-06-20T17:34:22.266Z",
+        "calculatedAt": "2026-06-21T04:03:57.290Z",
         "latestMeasurement": null
       }
     }

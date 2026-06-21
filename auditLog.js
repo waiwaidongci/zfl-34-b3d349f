@@ -70,6 +70,40 @@ export function pickBirdKeyFields(bird) {
   };
 }
 
+export function pickHealthRiskSummary(bird) {
+  if (!bird || !bird.healthRisk) {
+    return {
+      level: null,
+      score: null,
+      factorCount: 0,
+      factors: [],
+      topFactors: []
+    };
+  }
+  const risk = bird.healthRisk;
+  const factors = risk.factors || [];
+  const topFactors = factors
+    .slice()
+    .sort((a, b) => {
+      const severityWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+      return (severityWeight[b.severity] || 0) - (severityWeight[a.severity] || 0);
+    })
+    .slice(0, 3)
+    .map(f => ({
+      type: f.type,
+      severity: f.severity,
+      description: f.description
+    }));
+
+  return {
+    level: risk.level,
+    score: risk.score,
+    factorCount: factors.length,
+    topFactors,
+    calculatedAt: risk.calculatedAt
+  };
+}
+
 export function pickRingKeyFields(ring) {
   if (!ring) return null;
   return {

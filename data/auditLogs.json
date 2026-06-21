@@ -487,6 +487,94 @@
         "capturedCount": 100,
         "releasedCount": 100
       }
+    },
+    {
+      "id": "LOG-MQN9I57I-acdf4662",
+      "timestamp": "2026-06-21T04:03:55.998Z",
+      "operationType": "bird_health_risk_update",
+      "targetType": "bird",
+      "targetId": "SB-26001",
+      "requestSummary": {
+        "action": "recalculate_health_risk_explicit",
+        "levelChanged": false,
+        "previousLevel": "low",
+        "newLevel": "low"
+      },
+      "before": {
+        "bird": {
+          "ringNo": "SB-26001",
+          "species": "黑尾鸥",
+          "sex": "unknown",
+          "age": "adult",
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": "FS-2026-0503-001",
+          "measurementsCount": 1,
+          "recapturesCount": 1,
+          "observationsCount": 2,
+          "releasesCount": 1,
+          "healthRiskLevel": "low"
+        },
+        "healthRisk": {
+          "level": "low",
+          "score": 0,
+          "factorCount": 0,
+          "topFactors": [],
+          "calculatedAt": "2026-06-20T12:03:05.089Z"
+        }
+      },
+      "after": {
+        "bird": {
+          "ringNo": "SB-26001",
+          "species": "黑尾鸥",
+          "sex": "unknown",
+          "age": "adult",
+          "capturePlace": "东礁A区",
+          "season": "2026春",
+          "fieldSessionId": "FS-2026-0503-001",
+          "measurementsCount": 1,
+          "recapturesCount": 1,
+          "observationsCount": 2,
+          "releasesCount": 1,
+          "healthRiskLevel": "low"
+        },
+        "healthRisk": {
+          "level": "low",
+          "score": 0,
+          "factorCount": 0,
+          "topFactors": [],
+          "calculatedAt": "2026-06-21T04:03:55.997Z"
+        }
+      }
+    },
+    {
+      "id": "LOG-MQN9I67L-b3287bd7",
+      "timestamp": "2026-06-21T04:03:57.299Z",
+      "operationType": "all_health_risk_recalculate",
+      "targetType": "system",
+      "targetId": "system",
+      "requestSummary": {
+        "recalculatedCount": 11,
+        "changedCount": 3
+      },
+      "before": {
+        "total": 11,
+        "byLevel": {
+          "low": 3,
+          "medium": 0,
+          "high": 8,
+          "critical": 0
+        }
+      },
+      "after": {
+        "total": 11,
+        "byLevel": {
+          "low": 6,
+          "medium": 0,
+          "high": 5,
+          "critical": 0
+        }
+      }
     }
   ]
 }

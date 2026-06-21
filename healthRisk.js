@@ -13,7 +13,7 @@ const ABNORMAL_MOLT_KEYWORDS = [
   /羽毛脱落/, /秃/, /无羽毛/, /断羽/
 ];
 
-const RISK_LEVELS = {
+export const RISK_LEVELS = {
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
@@ -291,6 +291,161 @@ export function getRiskSummary(birds) {
   return summary;
 }
 
+export function getRiskTrendView(birds, { season, capturePlace } = {}) {
+  const risks = birds.map(bird => ({
+    ...calculateBirdRisk(bird),
+    season: bird.season,
+    capturePlace: bird.capturePlace
+  }));
+
+  let filteredRisks = risks;
+  if (season) {
+    filteredRisks = filteredRisks.filter(r => r.season === season);
+  }
+  if (capturePlace) {
+    filteredRisks = filteredRisks.filter(r => r.capturePlace === capturePlace);
+  }
+
+  const trendData = {
+    total: filteredRisks.length,
+    filters: { season, capturePlace },
+    bySeasonAndPlace: {},
+    bySeason: {},
+    byPlace: {},
+    generatedAt: new Date().toISOString()
+  };
+
+  for (const risk of filteredRisks) {
+    const s = risk.season || 'unknown';
+    const p = risk.capturePlace || 'unknown';
+    const spKey = `${s}|${p}`;
+
+    if (!trendData.bySeasonAndPlace[spKey]) {
+      trendData.bySeasonAndPlace[spKey] = {
+        season: s,
+        capturePlace: p,
+        total: 0,
+        byLevel: {
+          [RISK_LEVELS.LOW]: 0,
+          [RISK_LEVELS.MEDIUM]: 0,
+          [RISK_LEVELS.HIGH]: 0,
+          [RISK_LEVELS.CRITICAL]: 0
+        }
+      };
+    }
+    trendData.bySeasonAndPlace[spKey].total++;
+    trendData.bySeasonAndPlace[spKey].byLevel[risk.level]++;
+
+    if (!trendData.bySeason[s]) {
+      trendData.bySeason[s] = {
+        season: s,
+        total: 0,
+        byLevel: {
+          [RISK_LEVELS.LOW]: 0,
+          [RISK_LEVELS.MEDIUM]: 0,
+          [RISK_LEVELS.HIGH]: 0,
+          [RISK_LEVELS.CRITICAL]: 0
+        }
+      };
+    }
+    trendData.bySeason[s].total++;
+    trendData.bySeason[s].byLevel[risk.level]++;
+
+    if (!trendData.byPlace[p]) {
+      trendData.byPlace[p] = {
+        capturePlace: p,
+        total: 0,
+        byLevel: {
+          [RISK_LEVELS.LOW]: 0,
+          [RISK_LEVELS.MEDIUM]: 0,
+          [RISK_LEVELS.HIGH]: 0,
+          [RISK_LEVELS.CRITICAL]: 0
+        }
+      };
+    }
+    trendData.byPlace[p].total++;
+    trendData.byPlace[p].byLevel[risk.level]++;
+  }
+
+  trendData.bySeasonAndPlace = Object.values(trendData.bySeasonAndPlace).sort((a, b) => {
+    if (a.season !== b.season) return a.season.localeCompare(b.season);
+    return a.capturePlace.localeCompare(b.capturePlace);
+  });
+  trendData.bySeason = Object.values(trendData.bySeason).sort((a, b) => a.season.localeCompare(b.season));
+  trendData.byPlace = Object.values(trendData.byPlace).sort((a, b) => a.capturePlace.localeCompare(b.capturePlace));
+
+  return trendData;
+}
+
+export function getTopRiskFactors(birds, { limit = 10, severity, season, capturePlace } = {}) {
+  let filteredBirds = birds;
+  if (season) {
+    filteredBirds = filteredBirds.filter(b => b.season === season);
+  }
+  if (capturePlace) {
+    filteredBirds = filteredBirds.filter(b => b.capturePlace === capturePlace);
+  }
+
+  const risks = filteredBirds.map(bird => calculateBirdRisk(bird));
+  const factorStats = new Map();
+  const birdRingsByFactor = new Map();
+
+  for (const risk of risks) {
+    for (const factor of risk.factors) {
+      if (severity && factor.severity !== severity) continue;
+
+      const key = factor.type;
+      if (!factorStats.has(key)) {
+        factorStats.set(key, {
+          type: key,
+          description: factor.description,
+          severity: factor.severity,
+          count: 0,
+          totalScore: 0,
+          affectedBirds: new Set()
+        });
+      }
+      const stat = factorStats.get(key);
+      stat.count++;
+      stat.totalScore += risk.score;
+      stat.affectedBirds.add(risk.ringNo);
+
+      if (!birdRingsByFactor.has(key)) {
+        birdRingsByFactor.set(key, []);
+      }
+      if (!birdRingsByFactor.get(key).includes(risk.ringNo)) {
+        birdRingsByFactor.get(key).push(risk.ringNo);
+      }
+    }
+  }
+
+  const rankedFactors = Array.from(factorStats.values())
+    .map(stat => ({
+      type: stat.type,
+      description: stat.description,
+      severity: stat.severity,
+      count: stat.count,
+      affectedBirdCount: stat.affectedBirds.size,
+      avgScore: Number((stat.totalScore / stat.count).toFixed(1)),
+      sampleBirds: birdRingsByFactor.get(stat.type).slice(0, 5)
+    }))
+    .sort((a, b) => {
+      const severityWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+      const aWeight = (severityWeight[a.severity] || 0) * a.count;
+      const bWeight = (severityWeight[b.severity] || 0) * b.count;
+      if (bWeight !== aWeight) return bWeight - aWeight;
+      return b.affectedBirdCount - a.affectedBirdCount;
+    })
+    .slice(0, limit);
+
+  return {
+    totalFactors: factorStats.size,
+    topFactors: rankedFactors,
+    filters: { limit, severity, season, capturePlace },
+    generatedAt: new Date().toISOString()
+  };
+}
+
 export function persistRiskToBird(bird) {
   const risk = calculateBirdRisk(bird);
   bird.healthRisk = risk;
@@ -305,6 +460,8 @@ export default {
   calculateBirdRisk,
   calculateAllBirdsRisk,
   getRiskSummary,
+  getRiskTrendView,
+  getTopRiskFactors,
   persistRiskToBird,
   persistRiskToAllBirds,
   RISK_LEVELS

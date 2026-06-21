@@ -13,15 +13,19 @@ import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
-  pickBirdKeyFields
+  pickBirdKeyFields,
+  pickHealthRiskSummary
 } from "./auditLog.js";
 import { syncAllocateRing, isRingAllocated, getRingStatus } from "./ringInventory.js";
 import { validateDictionaryValues, validateDictionaryValue } from "./dictionaries.js";
 import {
   calculateBirdRisk,
   getRiskSummary,
+  getRiskTrendView,
+  getTopRiskFactors,
   persistRiskToBird,
-  persistRiskToAllBirds
+  persistRiskToAllBirds,
+  RISK_LEVELS
 } from "./healthRisk.js";
 
 async function ensureInitialized() {
@@ -182,8 +186,14 @@ export async function recalculateBirdHealthRisk(ringNo, explicit = false) {
   const eventsStore = await readEventsStore();
   const bird = reassembleBirdFromEvents(birdsStore.birds[idx], eventsStore.events);
   const beforeBird = pickBirdKeyFields(bird);
+  const beforeRisk = pickHealthRiskSummary(bird);
   const risk = calculateBirdRisk(bird);
   birdsStore.birds[idx].healthRisk = risk;
+
+  const updatedBird = reassembleBirdFromEvents(birdsStore.birds[idx], eventsStore.events);
+  const afterBird = pickBirdKeyFields(updatedBird);
+  const afterRisk = pickHealthRiskSummary(updatedBird);
+  const levelChanged = beforeRisk.level !== afterRisk.level;
 
   await writeBirdsStore(birdsStore);
 
@@ -191,12 +201,23 @@ export async function recalculateBirdHealthRisk(ringNo, explicit = false) {
     operationType: OPERATION_TYPES.BIRD_HEALTH_RISK_UPDATE,
     targetType: TARGET_TYPES.BIRD,
     targetId: ringNo,
-    requestSummary: { action: explicit ? "recalculate_health_risk_explicit" : "recalculate_health_risk" },
-    before: beforeBird,
-    after: pickBirdKeyFields(birdsStore.birds[idx])
+    requestSummary: {
+      action: explicit ? "recalculate_health_risk_explicit" : "recalculate_health_risk",
+      levelChanged,
+      previousLevel: beforeRisk.level,
+      newLevel: afterRisk.level
+    },
+    before: {
+      bird: beforeBird,
+      healthRisk: beforeRisk
+    },
+    after: {
+      bird: afterBird,
+      healthRisk: afterRisk
+    }
   });
 
-  return { ringNo, species: birdsStore.birds[idx].species, healthRisk: risk };
+  return { ringNo, species: birdsStore.birds[idx].species, healthRisk: risk, levelChanged };
 }
 
 export async function appendBirdEvent(ringNo, action, input) {
@@ -278,7 +299,22 @@ export async function appendBirdEvent(ringNo, action, input) {
 export async function getHealthRiskReport() {
   await ensureInitialized();
   const db = await loadLegacyCompatibleDb();
-  return getRiskSummary(db.birds);
+  const birds = persistRiskToAllBirds(db.birds);
+  return getRiskSummary(birds);
+}
+
+export async function getHealthRiskTrendView({ season, capturePlace } = {}) {
+  await ensureInitialized();
+  const db = await loadLegacyCompatibleDb();
+  const birds = persistRiskToAllBirds(db.birds);
+  return getRiskTrendView(birds, { season, capturePlace });
+}
+
+export async function getHealthRiskTopFactors({ limit, severity, season, capturePlace } = {}) {
+  await ensureInitialized();
+  const db = await loadLegacyCompatibleDb();
+  const birds = persistRiskToAllBirds(db.birds);
+  return getTopRiskFactors(birds, { limit, severity, season, capturePlace });
 }
 
 export async function recalculateAllBirdsHealthRisk() {
@@ -286,8 +322,36 @@ export async function recalculateAllBirdsHealthRisk() {
   const birdsStore = await readBirdsStore();
   const eventsStore = await readEventsStore();
 
+  const originalBirds = birdsStore.birds.map(b => reassembleBirdFromEvents(b, eventsStore.events));
+  const beforeByLevel = {
+    [RISK_LEVELS.LOW]: 0,
+    [RISK_LEVELS.MEDIUM]: 0,
+    [RISK_LEVELS.HIGH]: 0,
+    [RISK_LEVELS.CRITICAL]: 0
+  };
+  const levelChanges = [];
+
+  for (const bird of originalBirds) {
+    const level = bird.healthRisk ? bird.healthRisk.level : RISK_LEVELS.LOW;
+    beforeByLevel[level] = (beforeByLevel[level] || 0) + 1;
+  }
+
   const birds = birdsStore.birds.map(b => reassembleBirdFromEvents(b, eventsStore.events));
   persistRiskToAllBirds(birds);
+
+  for (let i = 0; i < originalBirds.length; i++) {
+    const beforeLevel = originalBirds[i].healthRisk ? originalBirds[i].healthRisk.level : null;
+    const afterLevel = birds[i].healthRisk ? birds[i].healthRisk.level : null;
+    if (beforeLevel !== afterLevel) {
+      levelChanges.push({
+        ringNo: originalBirds[i].ringNo,
+        beforeLevel,
+        afterLevel,
+        beforeRisk: pickHealthRiskSummary(originalBirds[i]),
+        afterRisk: pickHealthRiskSummary(birds[i])
+      });
+    }
+  }
 
   birdsStore.birds = birds.map(b => ({
     ringNo: b.ringNo,
@@ -308,14 +372,26 @@ export async function recalculateAllBirdsHealthRisk() {
     operationType: OPERATION_TYPES.ALL_HEALTH_RISK_RECALCULATE,
     targetType: TARGET_TYPES.SYSTEM,
     targetId: "system",
-    requestSummary: { recalculatedCount: birds.length },
-    before: null,
-    after: { total: summary.total, byLevel: summary.byLevel }
+    requestSummary: {
+      recalculatedCount: birds.length,
+      changedCount: levelChanges.length
+    },
+    before: {
+      total: originalBirds.length,
+      byLevel: beforeByLevel
+    },
+    after: {
+      total: summary.total,
+      byLevel: summary.byLevel
+    },
+    levelChanges: levelChanges.slice(0, 50)
   });
 
   return {
     message: "已重新计算全库健康风险",
     recalculatedCount: birds.length,
+    changedCount: levelChanges.length,
+    levelChanges: levelChanges.slice(0, 20),
     summary: {
       total: summary.total,
       byLevel: summary.byLevel,
