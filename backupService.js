@@ -217,7 +217,7 @@ export async function getSnapshotSummary(snapshotId) {
   return {
     snapshotId: entry.snapshotId,
     createdAt: entry.createdAt,
-    summary: snapshotData._meta?.summary || computeSummary(normalizedDb),
+    summary: computeSummary(normalizedDb),
     validation: validateSnapshotStructure(normalizedDb)
   };
 }
