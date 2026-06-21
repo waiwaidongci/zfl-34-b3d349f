@@ -13,7 +13,8 @@ import {
   readStore,
   writeStore,
   atomicWriteMulti,
-  splitLegacyBirdToEvents
+  splitLegacyBirdToEvents,
+  DATA_DIR
 } from "./dataStore.js";
 import {
   OPERATION_TYPES,
@@ -28,7 +29,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = STORE_FILES.legacySeabirds;
-const snapshotsDir = join(__dirname, "data", "snapshots");
+const snapshotsDir = join(DATA_DIR, "snapshots");
 const indexPath = join(snapshotsDir, "index.json");
 
 async function ensureSnapshotsDir() {

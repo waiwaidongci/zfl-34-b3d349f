@@ -13,7 +13,8 @@ import {
   reassembleBirdFromEvents,
   atomicWriteFile,
   atomicWriteMulti,
-  STORE_FILES
+  STORE_FILES,
+  DATA_DIR
 } from "./dataStore.js";
 import { getRingStatus, syncAllocateRing } from "./ringInventory.js";
 import { persistRiskToBird } from "./healthRisk.js";
@@ -26,7 +27,7 @@ import {
 } from "./auditLog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const IMPORTS_DIR = join(__dirname, "data", "imports");
+const IMPORTS_DIR = join(DATA_DIR, "imports");
 const INDEX_PATH = join(IMPORTS_DIR, "index.json");
 
 const KNOWN_SPECIES = new Set([
