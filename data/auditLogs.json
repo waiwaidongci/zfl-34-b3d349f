@@ -260,6 +260,273 @@
           }
         ]
       }
+    },
+    {
+      "id": "LOG-MQMMN9DJ-2216c453",
+      "timestamp": "2026-06-20T17:24:03.511Z",
+      "operationType": "ring_reserve",
+      "targetType": "ring",
+      "targetId": "SB-26002",
+      "requestSummary": {
+        "ringNo": "SB-26002",
+        "fieldSessionId": "FS-2026-0503-001",
+        "ttlHours": 24,
+        "expiresAt": "2026-06-21T17:24:03.510Z"
+      },
+      "before": {
+        "ringNo": "SB-26002",
+        "batchId": "BATCH-2026-SPRING-001",
+        "status": "available",
+        "allocatedTo": null,
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      },
+      "after": {
+        "ringNo": "SB-26002",
+        "batchId": "BATCH-2026-SPRING-001",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0503-001",
+        "reservedAt": "2026-06-20T17:24:03.510Z",
+        "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
+      }
+    },
+    {
+      "id": "LOG-MQMMOIK7-9d5623e6",
+      "timestamp": "2026-06-20T17:25:02.071Z",
+      "operationType": "bird_create",
+      "targetType": "bird",
+      "targetId": "SB-26002",
+      "requestSummary": {
+        "ringNo": "SB-26002",
+        "species": "黑尾鸥",
+        "sex": "female",
+        "age": "subadult",
+        "capturePlace": "东礁A区",
+        "season": "2026春"
+      },
+      "before": null,
+      "after": {
+        "ringNo": "SB-26002",
+        "species": "黑尾鸥",
+        "sex": "female",
+        "age": "subadult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "fieldSessionId": "FS-2026-0503-001",
+        "measurementsCount": 0,
+        "recapturesCount": 0,
+        "observationsCount": 0,
+        "releasesCount": 0,
+        "healthRiskLevel": "high"
+      }
+    },
+    {
+      "id": "LOG-MQMMTFA0-7f37abed",
+      "timestamp": "2026-06-20T17:28:51.096Z",
+      "operationType": "ring_batch_create",
+      "targetType": "ring_batch",
+      "targetId": "BATCH-2026春-MQMMTF9Y",
+      "requestSummary": {
+        "prefix": "SB",
+        "startNo": 27000,
+        "endNo": 27010,
+        "season": "2026春",
+        "description": "测试预留批次",
+        "generated": 11,
+        "conflicts": 0
+      },
+      "before": null,
+      "after": {
+        "id": "BATCH-2026春-MQMMTF9Y",
+        "prefix": "SB",
+        "startNo": 27000,
+        "endNo": 27010,
+        "season": "2026春",
+        "totalGenerated": 11
+      }
+    },
+    {
+      "id": "LOG-MQMMTW6J-682d18c9",
+      "timestamp": "2026-06-20T17:29:13.003Z",
+      "operationType": "ring_reserve",
+      "targetType": "ring",
+      "targetId": "SB-27005",
+      "requestSummary": {
+        "ringNo": "SB-27005",
+        "fieldSessionId": "FS-2026-0503-001",
+        "ttlHours": 24,
+        "expiresAt": "2026-06-21T17:29:13.003Z"
+      },
+      "before": {
+        "ringNo": "SB-27005",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "available",
+        "allocatedTo": null,
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      },
+      "after": {
+        "ringNo": "SB-27005",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0503-001",
+        "reservedAt": "2026-06-20T17:29:13.003Z",
+        "reservedExpiresAt": "2026-06-21T17:29:13.003Z"
+      }
+    },
+    {
+      "id": "LOG-MQMMU0JT-5ee1818a",
+      "timestamp": "2026-06-20T17:29:18.665Z",
+      "operationType": "bird_create",
+      "targetType": "bird",
+      "targetId": "SB-27005",
+      "requestSummary": {
+        "ringNo": "SB-27005",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春"
+      },
+      "before": null,
+      "after": {
+        "ringNo": "SB-27005",
+        "species": "黑尾鸥",
+        "sex": "male",
+        "age": "adult",
+        "capturePlace": "东礁A区",
+        "season": "2026春",
+        "fieldSessionId": "FS-2026-0503-001",
+        "measurementsCount": 0,
+        "recapturesCount": 0,
+        "observationsCount": 0,
+        "releasesCount": 0,
+        "healthRiskLevel": "high"
+      }
+    },
+    {
+      "id": "LOG-MQMMUYV8-0d8e9cf3",
+      "timestamp": "2026-06-20T17:30:03.140Z",
+      "operationType": "ring_reserve",
+      "targetType": "ring",
+      "targetId": "SB-27006",
+      "requestSummary": {
+        "ringNo": "SB-27006",
+        "fieldSessionId": "FS-2026-0503-001",
+        "ttlHours": 24,
+        "expiresAt": "2026-06-21T17:30:03.138Z"
+      },
+      "before": {
+        "ringNo": "SB-27006",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "available",
+        "allocatedTo": null,
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      },
+      "after": {
+        "ringNo": "SB-27006",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0503-001",
+        "reservedAt": "2026-06-20T17:30:03.138Z",
+        "reservedExpiresAt": "2026-06-21T17:30:03.138Z"
+      }
+    },
+    {
+      "id": "LOG-MQMMV2LC-cabe449d",
+      "timestamp": "2026-06-20T17:30:07.968Z",
+      "operationType": "ring_cancel_reservation",
+      "targetType": "ring",
+      "targetId": "SB-27006",
+      "requestSummary": {
+        "ringNo": "SB-27006"
+      },
+      "before": {
+        "ringNo": "SB-27006",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0503-001",
+        "reservedAt": "2026-06-20T17:30:03.138Z",
+        "reservedExpiresAt": "2026-06-21T17:30:03.138Z"
+      },
+      "after": {
+        "ringNo": "SB-27006",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "available",
+        "allocatedTo": null,
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      }
+    },
+    {
+      "id": "LOG-MQMMWPQ0-c52e6815",
+      "timestamp": "2026-06-20T17:31:24.600Z",
+      "operationType": "ring_reserve",
+      "targetType": "ring",
+      "targetId": "SB-27007",
+      "requestSummary": {
+        "ringNo": "SB-27007",
+        "fieldSessionId": "FS-2026-0611-001",
+        "ttlHours": 24,
+        "expiresAt": "2026-06-21T17:31:24.598Z"
+      },
+      "before": {
+        "ringNo": "SB-27007",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "available",
+        "allocatedTo": null,
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      },
+      "after": {
+        "ringNo": "SB-27007",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0611-001",
+        "reservedAt": "2026-06-20T17:31:24.598Z",
+        "reservedExpiresAt": "2026-06-21T17:31:24.598Z"
+      }
+    },
+    {
+      "id": "LOG-MQMN0IT9-5cbb04cb",
+      "timestamp": "2026-06-20T17:34:22.269Z",
+      "operationType": "ring_allocate",
+      "targetType": "ring",
+      "targetId": "SB-27007",
+      "requestSummary": {
+        "ringNo": "SB-27007",
+        "allocatedTo": "SB-27007",
+        "sync": true
+      },
+      "before": {
+        "ringNo": "SB-27007",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "reserved",
+        "allocatedTo": null,
+        "reservedBy": "FS-2026-0611-001",
+        "reservedAt": "2026-06-20T17:31:24.598Z",
+        "reservedExpiresAt": "2026-06-21T17:31:24.598Z"
+      },
+      "after": {
+        "ringNo": "SB-27007",
+        "batchId": "BATCH-2026春-MQMMTF9Y",
+        "status": "allocated",
+        "allocatedTo": "SB-27007",
+        "reservedBy": null,
+        "reservedAt": null,
+        "reservedExpiresAt": null
+      }
     }
   ]
 }

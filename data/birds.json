@@ -191,6 +191,78 @@
         "calculatedAt": "2026-06-20T15:04:43.696Z",
         "latestMeasurement": null
       }
+    },
+    {
+      "ringNo": "SB-26002",
+      "species": "黑尾鸥",
+      "sex": "female",
+      "age": "subadult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": {
+        "ringNo": "SB-26002",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T17:25:02.068Z",
+        "latestMeasurement": null
+      }
+    },
+    {
+      "ringNo": "SB-27005",
+      "species": "黑尾鸥",
+      "sex": "male",
+      "age": "adult",
+      "capturePlace": "东礁A区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0503-001",
+      "healthRisk": {
+        "ringNo": "SB-27005",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T17:29:18.663Z",
+        "latestMeasurement": null
+      }
+    },
+    {
+      "ringNo": "SB-27007",
+      "species": "黑尾鸥",
+      "sex": "female",
+      "age": "adult",
+      "capturePlace": "东礁B区",
+      "season": "2026春",
+      "fieldSessionId": "FS-2026-0611-001",
+      "healthRisk": {
+        "ringNo": "SB-27007",
+        "species": "黑尾鸥",
+        "level": "high",
+        "score": 60,
+        "factors": [
+          {
+            "type": "no_measurements",
+            "description": "无任何测量记录",
+            "severity": "high"
+          }
+        ],
+        "calculatedAt": "2026-06-20T17:34:22.266Z",
+        "latestMeasurement": null
+      }
     }
   ]
 }

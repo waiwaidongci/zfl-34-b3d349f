@@ -88,7 +88,11 @@ function mapBirdServiceError(e) {
     case "ring_exists":
       return { status: 409, error: "ring_exists", message: "环号已存在" };
     case "ring_allocated_in_inventory":
-      return { status: 409, error: "ring_allocated_in_inventory", message: e.message || "该环号在库存中已被占用" };
+      return { status: 409, error: "ring_allocated_in_inventory", message: e.userMessage || "该环号在库存中已被占用" };
+    case "ring_reserved":
+      return { status: 409, error: "ring_reserved", message: e.userMessage || "该环号已被预留" };
+    case "ring_reserved_by_other_session":
+      return { status: 409, error: "ring_reserved_by_other_session", message: e.userMessage || "该环号已被其他场次预留" };
     case "dictionary_validation_failed":
       return {
         status: 400,
@@ -338,6 +342,8 @@ const server = http.createServer(async (req, res) => {
         "GET /ring-inventory/rings", "GET /ring-inventory/rings/available",
         "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next",
         "POST /ring-inventory/rings/release",
+        "POST /ring-inventory/rings/reserve", "POST /ring-inventory/rings/cancel-reservation",
+        "GET /ring-inventory/rings/reserved", "GET /ring-inventory/rings/:ringNo/status",
         "POST /field-sessions", "GET /field-sessions",
         "GET /field-sessions/:id", "PUT /field-sessions/:id", "DELETE /field-sessions/:id",
         "GET /field-sessions/summary", "GET /field-sessions/:id/detail",

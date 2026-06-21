@@ -139,14 +139,20 @@ const SEED_DATA = {
         batchId: "BATCH-2026-SPRING-001",
         status: "allocated",
         allocatedTo: "SB-26001",
-        allocatedAt: "2026-05-03T00:00:00.000Z"
+        allocatedAt: "2026-05-03T00:00:00.000Z",
+        reservedBy: null,
+        reservedAt: null,
+        reservedExpiresAt: null
       },
       {
         ringNo: "SB-26002",
         batchId: "BATCH-2026-SPRING-001",
         status: "available",
         allocatedTo: null,
-        allocatedAt: null
+        allocatedAt: null,
+        reservedBy: null,
+        reservedAt: null,
+        reservedExpiresAt: null
       }
     ]
   },

@@ -15,7 +15,7 @@ import {
   recordAuditLog,
   pickBirdKeyFields
 } from "./auditLog.js";
-import { syncAllocateRing, isRingAllocated } from "./ringInventory.js";
+import { syncAllocateRing, isRingAllocated, getRingStatus } from "./ringInventory.js";
 import { validateDictionaryValues, validateDictionaryValue } from "./dictionaries.js";
 import {
   calculateBirdRisk,
@@ -71,10 +71,25 @@ export async function createBird(input) {
     const err = new Error("ring_exists");
     throw err;
   }
-  if (await isRingAllocated(input.ringNo)) {
-    const err = new Error("ring_allocated_in_inventory");
-    err.message = "该环号在库存中已被占用";
-    throw err;
+
+  const ringStatus = await getRingStatus(input.ringNo);
+  if (ringStatus) {
+    if (ringStatus.status === "allocated") {
+      const err = new Error("ring_allocated_in_inventory");
+      err.userMessage = "该环号在库存中已被占用";
+      throw err;
+    }
+    if (ringStatus.status === "reserved" && input.fieldSessionId) {
+      if (ringStatus.reservedBy !== input.fieldSessionId) {
+        const err = new Error("ring_reserved_by_other_session");
+        err.userMessage = "该环号已被其他场次预留";
+        throw err;
+      }
+    } else if (ringStatus.status === "reserved" && !input.fieldSessionId) {
+      const err = new Error("ring_reserved");
+      err.userMessage = "该环号已被预留";
+      throw err;
+    }
   }
 
   const bird = {
@@ -118,7 +133,9 @@ export async function createBird(input) {
 
   await writeBirdsAndEventsStore(birdsStore, eventsStore);
 
-  try { await syncAllocateRing(input.ringNo, input.ringNo); } catch (_) {}
+  try {
+    await syncAllocateRing(input.ringNo, input.ringNo);
+  } catch (_) {}
 
   recordAuditLog({
     operationType: OPERATION_TYPES.BIRD_CREATE,

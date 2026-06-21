@@ -17,6 +17,8 @@ export const OPERATION_TYPES = {
   RING_BATCH_CREATE: "ring_batch_create",
   RING_ALLOCATE: "ring_allocate",
   RING_RELEASE: "ring_release",
+  RING_RESERVE: "ring_reserve",
+  RING_CANCEL_RESERVATION: "ring_cancel_reservation",
   SESSION_CREATE: "session_create",
   SESSION_UPDATE: "session_update",
   SESSION_DELETE: "session_delete",
@@ -74,7 +76,10 @@ export function pickRingKeyFields(ring) {
     ringNo: ring.ringNo,
     batchId: ring.batchId,
     status: ring.status,
-    allocatedTo: ring.allocatedTo
+    allocatedTo: ring.allocatedTo,
+    reservedBy: ring.reservedBy,
+    reservedAt: ring.reservedAt,
+    reservedExpiresAt: ring.reservedExpiresAt
   };
 }
 

@@ -8,6 +8,17 @@
       "season": "2026春",
       "description": "2026年春季黑尾鸥环志批次",
       "createdAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "BATCH-2026春-MQMMTF9Y",
+      "prefix": "SB",
+      "startNo": 27000,
+      "endNo": 27010,
+      "season": "2026春",
+      "description": "测试预留批次",
+      "createdAt": "2026-06-20T17:28:51.094Z",
+      "totalGenerated": 11,
+      "conflicts": []
     }
   ],
   "rings": [
@@ -16,14 +27,130 @@
       "batchId": "BATCH-2026-SPRING-001",
       "status": "allocated",
       "allocatedTo": "SB-26001",
-      "allocatedAt": "2026-05-03T00:00:00.000Z"
+      "allocatedAt": "2026-05-03T00:00:00.000Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
     },
     {
       "ringNo": "SB-26002",
       "batchId": "BATCH-2026-SPRING-001",
+      "status": "reserved",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": "FS-2026-0503-001",
+      "reservedAt": "2026-06-20T17:24:03.510Z",
+      "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
+    },
+    {
+      "ringNo": "SB-27000",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
       "status": "available",
       "allocatedTo": null,
-      "allocatedAt": null
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27001",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27002",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27003",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27004",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27005",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "allocated",
+      "allocatedTo": "SB-27005",
+      "allocatedAt": "2026-06-20T17:29:18.665Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27006",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27007",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "allocated",
+      "allocatedTo": "SB-27007",
+      "allocatedAt": "2026-06-20T17:34:22.268Z",
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27008",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27009",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
+    },
+    {
+      "ringNo": "SB-27010",
+      "batchId": "BATCH-2026春-MQMMTF9Y",
+      "status": "available",
+      "allocatedTo": null,
+      "allocatedAt": null,
+      "reservedBy": null,
+      "reservedAt": null,
+      "reservedExpiresAt": null
     }
   ]
 }
