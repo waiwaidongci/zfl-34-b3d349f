@@ -3,25 +3,25 @@
     {
       "ringNo": "SB-26001",
       "species": "黑尾鸥",
-      "sex": "male",
-      "age": "subadult",
+      "sex": "unknown",
+      "age": "adult",
       "capturePlace": "东礁A区",
       "season": "2026春",
-      "fieldSessionId": null,
+      "fieldSessionId": "FS-2026-0503-001",
       "healthRisk": {
         "ringNo": "SB-26001",
         "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-21T03:01:18.570Z",
-        "latestMeasurement": null
+        "level": "low",
+        "score": 0,
+        "factors": [],
+        "calculatedAt": "2026-06-20T12:03:05.089Z",
+        "latestMeasurement": {
+          "at": "2026-05-03",
+          "wing": 328,
+          "weight": 512,
+          "bill": 44,
+          "fieldSessionId": "FS-2026-0503-001"
+        }
       }
     },
     {
@@ -261,54 +261,6 @@
           }
         ],
         "calculatedAt": "2026-06-20T17:34:22.266Z",
-        "latestMeasurement": null
-      }
-    },
-    {
-      "ringNo": "SB-27000",
-      "species": "黑尾鸥",
-      "sex": "male",
-      "age": "adult",
-      "capturePlace": "东礁A区",
-      "season": "2026春",
-      "fieldSessionId": "FS-2026-0503-001",
-      "healthRisk": {
-        "ringNo": "SB-27000",
-        "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-21T02:11:33.609Z",
-        "latestMeasurement": null
-      }
-    },
-    {
-      "ringNo": "SB-27001",
-      "species": "黑尾鸥",
-      "sex": "female",
-      "age": "subadult",
-      "capturePlace": "东礁A区",
-      "season": "2026春",
-      "fieldSessionId": null,
-      "healthRisk": {
-        "ringNo": "SB-27001",
-        "species": "黑尾鸥",
-        "level": "high",
-        "score": 60,
-        "factors": [
-          {
-            "type": "no_measurements",
-            "description": "无任何测量记录",
-            "severity": "high"
-          }
-        ],
-        "calculatedAt": "2026-06-21T02:13:18.002Z",
         "latestMeasurement": null
       }
     }
