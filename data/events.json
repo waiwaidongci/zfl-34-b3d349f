@@ -44,6 +44,16 @@
       }
     },
     {
+      "ringNo": "SB-26001",
+      "eventType": "observations",
+      "eventIndex": 1,
+      "data": {
+        "at": "2026-06-19T14:00:00.000Z",
+        "point": "N30.2,E122.4",
+        "note": "近海觅食"
+      }
+    },
+    {
       "ringNo": "SB-26005",
       "eventType": "measurements",
       "eventIndex": 0,
@@ -120,16 +130,6 @@
         "place": "东礁B区",
         "note": "状态良好，换羽中",
         "fieldSessionId": "FS-2026-0618-OCZL"
-      }
-    },
-    {
-      "ringNo": "SB-26001",
-      "eventType": "observations",
-      "eventIndex": 1,
-      "data": {
-        "at": "2026-06-19T14:00:00.000Z",
-        "point": "N30.2,E122.4",
-        "note": "近海觅食"
       }
     },
     {

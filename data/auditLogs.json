@@ -575,6 +575,327 @@
           "critical": 0
         }
       }
+    },
+    {
+      "id": "LOG-MQNABZRP-8dbc5fe8",
+      "timestamp": "2026-06-21T04:27:08.629Z",
+      "operationType": "system_snapshot_create",
+      "targetType": "system",
+      "targetId": "SNAP-20260621042708-4848deb0",
+      "requestSummary": {
+        "snapshotId": "SNAP-20260621042708-4848deb0",
+        "summary": {
+          "totalBirds": 11,
+          "speciesBreakdown": [
+            {
+              "species": "黑尾鸥",
+              "count": 10
+            },
+            {
+              "species": "红嘴鸥",
+              "count": 1
+            }
+          ],
+          "totalMeasurements": 6,
+          "totalRecaptures": 2,
+          "totalObservations": 2,
+          "totalReleases": 3,
+          "totalEvents": 13,
+          "eventTypeBreakdown": [
+            {
+              "type": "measurements",
+              "count": 6
+            },
+            {
+              "type": "releases",
+              "count": 3
+            },
+            {
+              "type": "recaptures",
+              "count": 2
+            },
+            {
+              "type": "observations",
+              "count": 2
+            }
+          ],
+          "dictionaries": {
+            "species": 2,
+            "capturePlace": 2,
+            "season": 1
+          },
+          "totalFieldSessions": 3,
+          "ringInventory": {
+            "totalBatches": 2,
+            "totalRings": 13,
+            "statusBreakdown": [
+              {
+                "status": "allocated",
+                "count": 3
+              },
+              {
+                "status": "reserved",
+                "count": 1
+              },
+              {
+                "status": "available",
+                "count": 9
+              }
+            ]
+          }
+        }
+      },
+      "before": null,
+      "after": {
+        "summary": {
+          "totalBirds": 11,
+          "speciesBreakdown": [
+            {
+              "species": "黑尾鸥",
+              "count": 10
+            },
+            {
+              "species": "红嘴鸥",
+              "count": 1
+            }
+          ],
+          "totalMeasurements": 6,
+          "totalRecaptures": 2,
+          "totalObservations": 2,
+          "totalReleases": 3,
+          "totalEvents": 13,
+          "eventTypeBreakdown": [
+            {
+              "type": "measurements",
+              "count": 6
+            },
+            {
+              "type": "releases",
+              "count": 3
+            },
+            {
+              "type": "recaptures",
+              "count": 2
+            },
+            {
+              "type": "observations",
+              "count": 2
+            }
+          ],
+          "dictionaries": {
+            "species": 2,
+            "capturePlace": 2,
+            "season": 1
+          },
+          "totalFieldSessions": 3,
+          "ringInventory": {
+            "totalBatches": 2,
+            "totalRings": 13,
+            "statusBreakdown": [
+              {
+                "status": "allocated",
+                "count": 3
+              },
+              {
+                "status": "reserved",
+                "count": 1
+              },
+              {
+                "status": "available",
+                "count": 9
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "LOG-MQNACP28-9dad3c23",
+      "timestamp": "2026-06-21T04:27:41.408Z",
+      "operationType": "system_snapshot_restore",
+      "targetType": "system",
+      "targetId": "SNAP-20260621042708-4848deb0",
+      "requestSummary": {
+        "snapshotId": "SNAP-20260621042708-4848deb0",
+        "diff": {
+          "birds": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedRingNos": [],
+            "removedRingNos": [],
+            "changedRingNos": []
+          },
+          "events": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedEventKeys": [],
+            "removedEventKeys": [],
+            "changedEventKeys": []
+          },
+          "dictionaries": {
+            "species": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "capturePlace": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "season": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            }
+          },
+          "fieldSessions": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedIds": [],
+            "removedIds": [],
+            "changedIds": []
+          },
+          "ringInventory": {
+            "batches": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedIds": [],
+              "removedIds": [],
+              "changedIds": []
+            },
+            "rings": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedRingNos": [],
+              "removedRingNos": [],
+              "changedRingNos": []
+            }
+          }
+        }
+      },
+      "before": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      },
+      "after": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      }
+    },
+    {
+      "id": "LOG-MQNACUWY-68a9cf87",
+      "timestamp": "2026-06-21T04:27:48.994Z",
+      "operationType": "system_snapshot_restore",
+      "targetType": "system",
+      "targetId": "SNAP-20260621042708-4848deb0",
+      "requestSummary": {
+        "snapshotId": "SNAP-20260621042708-4848deb0",
+        "diff": {
+          "birds": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedRingNos": [],
+            "removedRingNos": [],
+            "changedRingNos": []
+          },
+          "events": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedEventKeys": [],
+            "removedEventKeys": [],
+            "changedEventKeys": []
+          },
+          "dictionaries": {
+            "species": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "capturePlace": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "season": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [],
+              "changedValues": []
+            }
+          },
+          "fieldSessions": {
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "addedIds": [],
+            "removedIds": [],
+            "changedIds": []
+          },
+          "ringInventory": {
+            "batches": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedIds": [],
+              "removedIds": [],
+              "changedIds": []
+            },
+            "rings": {
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "addedRingNos": [],
+              "removedRingNos": [],
+              "changedRingNos": []
+            }
+          }
+        }
+      },
+      "before": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      },
+      "after": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      }
     }
   ]
 }

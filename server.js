@@ -364,7 +364,8 @@ const server = http.createServer(async (req, res) => {
         "GET /audit-logs?dateFrom=&dateTo=&operationType=&ringNo=&targetId=&limit=&offset=",
         "GET /audit-logs/stats",
         "POST /backups/snapshots", "GET /backups/snapshots",
-        "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/restore",
+        "GET /backups/snapshots/:id", "POST /backups/snapshots/:id/preview",
+        "POST /backups/snapshots/:id/restore", "POST /backups/snapshots/:id/restore?previewOnly=true",
         "POST /offline-sync"
       ]
     });

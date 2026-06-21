@@ -65,6 +65,71 @@
         "totalObservations": 1,
         "totalReleases": 1
       }
+    },
+    {
+      "snapshotId": "SNAP-20260621042708-4848deb0",
+      "createdAt": "2026-06-21T04:27:08.628Z",
+      "fileName": "SNAP-20260621042708-4848deb0.json",
+      "summary": {
+        "totalBirds": 11,
+        "speciesBreakdown": [
+          {
+            "species": "黑尾鸥",
+            "count": 10
+          },
+          {
+            "species": "红嘴鸥",
+            "count": 1
+          }
+        ],
+        "totalMeasurements": 6,
+        "totalRecaptures": 2,
+        "totalObservations": 2,
+        "totalReleases": 3,
+        "totalEvents": 13,
+        "eventTypeBreakdown": [
+          {
+            "type": "measurements",
+            "count": 6
+          },
+          {
+            "type": "releases",
+            "count": 3
+          },
+          {
+            "type": "recaptures",
+            "count": 2
+          },
+          {
+            "type": "observations",
+            "count": 2
+          }
+        ],
+        "dictionaries": {
+          "species": 2,
+          "capturePlace": 2,
+          "season": 1
+        },
+        "totalFieldSessions": 3,
+        "ringInventory": {
+          "totalBatches": 2,
+          "totalRings": 13,
+          "statusBreakdown": [
+            {
+              "status": "allocated",
+              "count": 3
+            },
+            {
+              "status": "reserved",
+              "count": 1
+            },
+            {
+              "status": "available",
+              "count": 9
+            }
+          ]
+        }
+      }
     }
   ]
 }

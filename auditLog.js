@@ -25,7 +25,9 @@ export const OPERATION_TYPES = {
   DICTIONARY_ENTRY_ADD: "dictionary_entry_add",
   DICTIONARY_ENTRY_UPDATE: "dictionary_entry_update",
   DICTIONARY_ENTRY_DELETE: "dictionary_entry_delete",
-  OFFLINE_SYNC_PACKET: "offline_sync_packet"
+  OFFLINE_SYNC_PACKET: "offline_sync_packet",
+  SYSTEM_SNAPSHOT_RESTORE: "system_snapshot_restore",
+  SYSTEM_SNAPSHOT_CREATE: "system_snapshot_create"
 };
 
 export const TARGET_TYPES = {
