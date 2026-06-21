@@ -1046,6 +1046,67 @@ curl -s http://localhost:3034/field-sessions/summary \
 
 ### 统计报表
 - `GET /reports/recapture-rate?season=` - 按季节统计复捕率
+- `GET /reports/migration-summary?species=&season=` - 迁徙概览统计（每只鸟的迁徙距离、时长、事件数等）
+- `GET /reports/migration-hotspots?species=&season=&dateFrom=&dateTo=` - 按观测点聚合的热点统计（坐标、事件数、环号数、最近观测时间、平均移动距离）
+
+---
+
+## 迁徙报告 API
+
+### 1. 迁徙概览统计
+
+**GET /reports/migration-summary**
+
+查询参数：
+- `species` (可选)：按物种筛选
+- `season` (可选)：按季节筛选
+
+返回每只鸟的迁徙概览，包括环号、物种、季节、最新位置、迁徙天数、总距离和事件数。
+
+### 2. 迁徙热点统计（按观测点聚合）
+
+**GET /reports/migration-hotspots**
+
+基于 `observations` 中的 `point` 字段解析经纬度，按观测点聚合统计热点数据。
+
+查询参数：
+- `species` (可选)：按物种筛选
+- `season` (可选)：按季节筛选
+- `dateFrom` (可选)：起始日期（含），如 `?dateFrom=2026-05-01`
+- `dateTo` (可选)：截止日期（含），如 `?dateTo=2026-06-30`
+
+返回字段：
+- `point`：原始点标识字符串（如 `N30.1,E122.3`）
+- `lat`：纬度
+- `lng`：经度
+- `eventCount`：该点的观测事件数
+- `ringNoCount`：涉及的不同环号数量
+- `latestObservationAt`：最近一次观测时间
+- `avgMoveDistance`：鸟类飞到该点的平均移动距离（公里）
+
+响应示例（200）：
+```json
+[
+  {
+    "point": "N30.1,E122.3",
+    "lat": 30.1,
+    "lng": 122.3,
+    "eventCount": 5,
+    "ringNoCount": 3,
+    "latestObservationAt": "2026-06-15",
+    "avgMoveDistance": 45.23
+  }
+]
+```
+
+示例：
+```bash
+# 查询所有热点
+curl -s http://localhost:3034/reports/migration-hotspots | python3 -m json.tool
+
+# 按物种和日期范围筛选
+curl -s 'http://localhost:3034/reports/migration-hotspots?species=黑尾鸥&dateFrom=2026-05-01&dateTo=2026-06-30' | python3 -m json.tool
+```
 
 ---
 

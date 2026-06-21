@@ -344,6 +344,7 @@ const server = http.createServer(async (req, res) => {
         "POST /health-risk/recalculate-all",
         "GET /reports/recapture-rate?season=",
         "GET /reports/migration-summary?species=&season=",
+        "GET /reports/migration-hotspots?species=&season=&dateFrom=&dateTo=",
         "POST /ring-inventory/batches", "GET /ring-inventory/batches",
         "GET /ring-inventory/rings", "GET /ring-inventory/rings/available",
         "POST /ring-inventory/rings/allocate", "POST /ring-inventory/rings/allocate-next",

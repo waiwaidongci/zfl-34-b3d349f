@@ -88,3 +88,103 @@ export function buildMigrationSummary(birds, { species, season } = {}) {
     };
   });
 }
+
+export function buildHotspotStats(birds, { species, season, dateFrom, dateTo } = {}) {
+  let filteredBirds = birds;
+  if (species) filteredBirds = filteredBirds.filter(b => b.species === species);
+  if (season) filteredBirds = filteredBirds.filter(b => b.season === season);
+
+  const allObservations = [];
+  for (const bird of filteredBirds) {
+    const observations = bird.observations || [];
+    for (const obs of observations) {
+      const coord = parsePoint(obs.point);
+      if (!coord) continue;
+
+      const obsDate = new Date(obs.at);
+      if (isNaN(obsDate.getTime())) continue;
+
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        if (obsDate < fromDate) continue;
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        if (obsDate > toDate) continue;
+      }
+
+      allObservations.push({
+        ringNo: bird.ringNo,
+        species: bird.species,
+        point: obs.point,
+        coord,
+        at: obs.at,
+        date: obsDate
+      });
+    }
+  }
+
+  const birdObsMap = new Map();
+  for (const obs of allObservations) {
+    if (!birdObsMap.has(obs.ringNo)) birdObsMap.set(obs.ringNo, []);
+    birdObsMap.get(obs.ringNo).push(obs);
+  }
+  for (const obsList of birdObsMap.values()) {
+    obsList.sort((a, b) => a.date - b.date);
+  }
+
+  const hotspotMap = new Map();
+  for (const obs of allObservations) {
+    const key = obs.point;
+    if (!hotspotMap.has(key)) {
+      hotspotMap.set(key, {
+        point: obs.point,
+        lat: obs.coord.lat,
+        lng: obs.coord.lng,
+        eventCount: 0,
+        ringNos: new Set(),
+        latestAt: obs.date,
+        latestAtStr: obs.at,
+        moveDistances: []
+      });
+    }
+    const hotspot = hotspotMap.get(key);
+    hotspot.eventCount += 1;
+    hotspot.ringNos.add(obs.ringNo);
+    if (obs.date > hotspot.latestAt) {
+      hotspot.latestAt = obs.date;
+      hotspot.latestAtStr = obs.at;
+    }
+
+    const birdObsList = birdObsMap.get(obs.ringNo);
+    const obsIdx = birdObsList.findIndex(o => o === obs);
+    if (obsIdx > 0) {
+      const prevObs = birdObsList[obsIdx - 1];
+      const dist = haversineKm(prevObs.coord, obs.coord);
+      if (dist > 0) {
+        hotspot.moveDistances.push(dist);
+      }
+    }
+  }
+
+  const result = [];
+  for (const hotspot of hotspotMap.values()) {
+    const avgMoveDistance = hotspot.moveDistances.length
+      ? hotspot.moveDistances.reduce((sum, d) => sum + d, 0) / hotspot.moveDistances.length
+      : 0;
+
+    result.push({
+      point: hotspot.point,
+      lat: hotspot.lat,
+      lng: hotspot.lng,
+      eventCount: hotspot.eventCount,
+      ringNoCount: hotspot.ringNos.size,
+      latestObservationAt: hotspot.latestAtStr,
+      avgMoveDistance: Number(avgMoveDistance.toFixed(2))
+    });
+  }
+
+  result.sort((a, b) => b.eventCount - a.eventCount);
+
+  return result;
+}
