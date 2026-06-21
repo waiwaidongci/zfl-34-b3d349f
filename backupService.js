@@ -19,6 +19,7 @@ import {
   OPERATION_TYPES,
   TARGET_TYPES,
   recordAuditLog,
+  buildAuditLogEntry,
   pickBirdKeyFields,
   pickSessionKeyFields,
   pickDictEntryKeyFields,
@@ -835,6 +836,86 @@ export async function checkConsistency() {
     });
   }
 
+  const orphanAuditBirdRefs = [];
+  const orphanAuditRingRefs = [];
+  const orphanAuditRingBatchRefs = [];
+  const orphanAuditSessionRefs = [];
+  const orphanAuditDictRefs = [];
+  for (const log of db.auditLogs) {
+    switch (log.targetType) {
+      case TARGET_TYPES.BIRD:
+        if (log.targetId && !birdRingNoSet.has(log.targetId)) {
+          orphanAuditBirdRefs.push({ logId: log.id, targetId: log.targetId, operationType: log.operationType });
+        }
+        break;
+      case TARGET_TYPES.RING:
+        if (log.targetId && !ringMap.has(log.targetId)) {
+          orphanAuditRingRefs.push({ logId: log.id, targetId: log.targetId, operationType: log.operationType });
+        }
+        break;
+      case TARGET_TYPES.RING_BATCH:
+        if (log.targetId && !batchMap.has(log.targetId)) {
+          orphanAuditRingBatchRefs.push({ logId: log.id, targetId: log.targetId, operationType: log.operationType });
+        }
+        break;
+      case TARGET_TYPES.SESSION:
+        if (log.targetId && !sessionMap.has(log.targetId)) {
+          orphanAuditSessionRefs.push({ logId: log.id, targetId: log.targetId, operationType: log.operationType });
+        }
+        break;
+      case TARGET_TYPES.DICTIONARY: {
+        const dictType = typeof log.targetId === "string" ? log.targetId.split("|")[0] : null;
+        const dictValue = typeof log.targetId === "string" ? log.targetId.split("|").slice(1).join("|") : null;
+        if (dictType && dictValue && dictValues[dictType] && !dictValues[dictType].has(dictValue)) {
+          orphanAuditDictRefs.push({ logId: log.id, targetId: log.targetId, dictType, dictValue, operationType: log.operationType });
+        } else if (log.targetId && !dictType) {
+          orphanAuditDictRefs.push({ logId: log.id, targetId: log.targetId, operationType: log.operationType, note: "无法解析字典类型" });
+        }
+        break;
+      }
+    }
+  }
+  if (orphanAuditBirdRefs.length > 0) {
+    nonRepairable.push({
+      type: "audit_invalid_bird_ref",
+      description: "审计日志引用了不存在的鸟类环号",
+      count: orphanAuditBirdRefs.length,
+      details: orphanAuditBirdRefs
+    });
+  }
+  if (orphanAuditRingRefs.length > 0) {
+    nonRepairable.push({
+      type: "audit_invalid_ring_ref",
+      description: "审计日志引用了不存在的环号",
+      count: orphanAuditRingRefs.length,
+      details: orphanAuditRingRefs
+    });
+  }
+  if (orphanAuditRingBatchRefs.length > 0) {
+    nonRepairable.push({
+      type: "audit_invalid_ring_batch_ref",
+      description: "审计日志引用了不存在的环号批次ID",
+      count: orphanAuditRingBatchRefs.length,
+      details: orphanAuditRingBatchRefs
+    });
+  }
+  if (orphanAuditSessionRefs.length > 0) {
+    nonRepairable.push({
+      type: "audit_invalid_session_ref",
+      description: "审计日志引用了不存在的场次ID",
+      count: orphanAuditSessionRefs.length,
+      details: orphanAuditSessionRefs
+    });
+  }
+  if (orphanAuditDictRefs.length > 0) {
+    nonRepairable.push({
+      type: "audit_invalid_dict_ref",
+      description: "审计日志引用了不存在的字典值",
+      count: orphanAuditDictRefs.length,
+      details: orphanAuditDictRefs
+    });
+  }
+
   const result = {
     checkedAt: new Date().toISOString(),
     summary: {
@@ -843,6 +924,7 @@ export async function checkConsistency() {
       totalFieldSessions: db.fieldSessions.length,
       totalRings: (db.ringInventory.rings || []).length,
       totalBatches: (db.ringInventory.batches || []).length,
+      totalAuditLogs: db.auditLogs.length,
       repairableCount: repairable.length,
       nonRepairableCount: nonRepairable.length
     },
@@ -850,7 +932,7 @@ export async function checkConsistency() {
     nonRepairable
   };
 
-  await recordAuditLog({
+  const checkAuditEntry = buildAuditLogEntry({
     operationType: OPERATION_TYPES.SYSTEM_CONSISTENCY_CHECK,
     targetType: TARGET_TYPES.SYSTEM,
     targetId: "consistency-check",
@@ -863,6 +945,11 @@ export async function checkConsistency() {
     before: null,
     after: null
   });
+
+  const newAuditLogs = [...db.auditLogs, checkAuditEntry];
+  await atomicWriteMulti([
+    [STORE_FILES.auditLogs, { logs: newAuditLogs }]
+  ]);
 
   return result;
 }
@@ -1062,16 +1149,7 @@ export async function repairConsistency(repairPlan) {
     }
   }
 
-  const writeBatch = [];
-  writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
-  writeBatch.push([STORE_FILES.events, { events: newEvents }]);
-  writeBatch.push([STORE_FILES.dictionaries, newDictionaries]);
-  writeBatch.push([STORE_FILES.fieldSessions, { fieldSessions: newFieldSessions }]);
-  writeBatch.push([STORE_FILES.ringInventory, newRingInventory]);
-
-  await atomicWriteMulti(writeBatch);
-
-  await recordAuditLog({
+  const repairAuditEntry = buildAuditLogEntry({
     operationType: OPERATION_TYPES.SYSTEM_CONSISTENCY_REPAIR,
     targetType: TARGET_TYPES.SYSTEM,
     targetId: "consistency-repair",
@@ -1089,6 +1167,18 @@ export async function repairConsistency(repairPlan) {
       repairDetails
     }
   });
+
+  const newAuditLogs = [...db.auditLogs, repairAuditEntry];
+
+  const writeBatch = [];
+  writeBatch.push([STORE_FILES.birds, { birds: newBirds }]);
+  writeBatch.push([STORE_FILES.events, { events: newEvents }]);
+  writeBatch.push([STORE_FILES.dictionaries, newDictionaries]);
+  writeBatch.push([STORE_FILES.fieldSessions, { fieldSessions: newFieldSessions }]);
+  writeBatch.push([STORE_FILES.ringInventory, newRingInventory]);
+  writeBatch.push([STORE_FILES.auditLogs, { logs: newAuditLogs }]);
+
+  await atomicWriteMulti(writeBatch);
 
   const recheckResult = await checkConsistency();
 

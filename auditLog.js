@@ -142,7 +142,7 @@ export function pickDictEntryKeyFields(entry) {
   };
 }
 
-export async function recordAuditLog({
+export function buildAuditLogEntry({
   operationType,
   targetType,
   targetId,
@@ -151,20 +151,25 @@ export async function recordAuditLog({
   after = null,
   levelChanges
 }) {
+  const logEntry = {
+    id: generateLogId(),
+    timestamp: new Date().toISOString(),
+    operationType,
+    targetType,
+    targetId,
+    requestSummary,
+    before,
+    after
+  };
+  if (levelChanges !== undefined) {
+    logEntry.levelChanges = levelChanges;
+  }
+  return logEntry;
+}
+
+export async function recordAuditLog(payload) {
   try {
-    const logEntry = {
-      id: generateLogId(),
-      timestamp: new Date().toISOString(),
-      operationType,
-      targetType,
-      targetId,
-      requestSummary,
-      before,
-      after
-    };
-    if (levelChanges !== undefined) {
-      logEntry.levelChanges = levelChanges;
-    }
+    const logEntry = buildAuditLogEntry(payload);
 
     const data = await loadAuditLogs();
     data.logs.push(logEntry);
