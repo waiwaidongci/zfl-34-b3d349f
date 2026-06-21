@@ -212,12 +212,80 @@ export async function getSnapshotSummary(snapshotId) {
     return null;
   }
 
+  const normalizedDb = normalizeSnapshotDb(snapshotData.data);
+
   return {
     snapshotId: entry.snapshotId,
     createdAt: entry.createdAt,
-    summary: snapshotData._meta?.summary || entry.summary,
-    validation: validateSnapshotStructure(snapshotData.data)
+    summary: snapshotData._meta?.summary || computeSummary(normalizedDb),
+    validation: validateSnapshotStructure(normalizedDb)
   };
+}
+
+function isLegacyFormat(db) {
+  if (!db) return false;
+  const hasEmbeddedEvents = Array.isArray(db.birds) && db.birds.some(b =>
+    Array.isArray(b.measurements) || Array.isArray(b.releases) ||
+    Array.isArray(b.recaptures) || Array.isArray(b.observations)
+  );
+  const missingEvents = !Array.isArray(db.events) || db.events.length === 0;
+  const missingDicts = !db.dictionaries || Object.keys(db.dictionaries).length === 0;
+  const missingSessions = !Array.isArray(db.fieldSessions) || db.fieldSessions.length === 0;
+  const missingRingInv = !db.ringInventory ||
+    ((!Array.isArray(db.ringInventory.batches) || db.ringInventory.batches.length === 0) &&
+     (!Array.isArray(db.ringInventory.rings) || db.ringInventory.rings.length === 0));
+  return hasEmbeddedEvents && (missingEvents || missingDicts || missingSessions || missingRingInv);
+}
+
+function extractEventTypesFromBirds(birds) {
+  const types = new Set();
+  for (const bird of birds || []) {
+    if (Array.isArray(bird.measurements) && bird.measurements.length > 0) types.add("measurements");
+    if (Array.isArray(bird.releases) && bird.releases.length > 0) types.add("releases");
+    if (Array.isArray(bird.recaptures) && bird.recaptures.length > 0) types.add("recaptures");
+    if (Array.isArray(bird.observations) && bird.observations.length > 0) types.add("observations");
+  }
+  return [...types];
+}
+
+function normalizeSnapshotDb(db) {
+  if (!db || !Array.isArray(db.birds)) {
+    return db || { birds: [] };
+  }
+
+  const normalized = { ...db };
+  const birds = normalized.birds;
+
+  if (!normalized.events || !Array.isArray(normalized.events) || normalized.events.length === 0) {
+    const events = [];
+    for (const lb of birds) {
+      const { events: birdEvents } = splitLegacyBirdToEvents(lb);
+      events.push(...birdEvents);
+    }
+    normalized.events = events;
+  }
+
+  if (!normalized.dictionaries || typeof normalized.dictionaries !== "object") {
+    normalized.dictionaries = { species: [], capturePlace: [], season: [] };
+  } else {
+    if (!normalized.dictionaries.species) normalized.dictionaries.species = [];
+    if (!normalized.dictionaries.capturePlace) normalized.dictionaries.capturePlace = [];
+    if (!normalized.dictionaries.season) normalized.dictionaries.season = [];
+  }
+
+  if (!normalized.fieldSessions || !Array.isArray(normalized.fieldSessions)) {
+    normalized.fieldSessions = [];
+  }
+
+  if (!normalized.ringInventory || typeof normalized.ringInventory !== "object") {
+    normalized.ringInventory = { batches: [], rings: [] };
+  } else {
+    if (!Array.isArray(normalized.ringInventory.batches)) normalized.ringInventory.batches = [];
+    if (!Array.isArray(normalized.ringInventory.rings)) normalized.ringInventory.rings = [];
+  }
+
+  normalized._legacyFormatNormalized = isLegacyFormat(db);
+  return normalized;
 }
 
 function deepEqual(a, b) {
@@ -460,8 +528,12 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
     throw new Error("snapshot_file_corrupt");
   }
 
-  const db = snapshotData.data;
-  if (!db) throw new Error("snapshot_data_missing");
+  const rawDb = snapshotData.data;
+  if (!rawDb) throw new Error("snapshot_data_missing");
+
+  const db = normalizeSnapshotDb(rawDb);
+  const isLegacyFormat = db._legacyFormatNormalized;
+  delete db._legacyFormatNormalized;
 
   const validation = validateSnapshotStructure(db);
   if (!validation.valid) {
@@ -476,6 +548,7 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
     return {
       snapshotId,
       previewOnly: true,
+      legacyFormatNormalized: isLegacyFormat,
       diff: diff.summary,
       diffDetails: diff.details,
       snapshotSummary: computeSummary(db),
@@ -495,6 +568,7 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
     targetId: snapshotId,
     requestSummary: {
       snapshotId,
+      legacyFormatNormalized: isLegacyFormat,
       diff: diff.summary
     },
     before: {
@@ -516,6 +590,7 @@ export async function restoreFromSnapshot(snapshotId, options = {}) {
   return {
     snapshotId,
     restoredAt: new Date().toISOString(),
+    legacyFormatNormalized: isLegacyFormat,
     summary: computeSummary(db),
     diff: diff.summary
   };

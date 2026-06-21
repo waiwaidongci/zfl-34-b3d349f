@@ -896,6 +896,806 @@
           "rings": []
         }
       }
+    },
+    {
+      "id": "LOG-MQNAWEVQ-c4cd588a",
+      "timestamp": "2026-06-21T04:43:01.334Z",
+      "operationType": "system_snapshot_restore",
+      "targetType": "system",
+      "targetId": "SNAP-20260620133353-c7a443cc",
+      "requestSummary": {
+        "snapshotId": "SNAP-20260620133353-c7a443cc",
+        "legacyFormatNormalized": true,
+        "diff": {
+          "birds": {
+            "added": 0,
+            "removed": 7,
+            "changed": 4,
+            "addedRingNos": [],
+            "removedRingNos": [
+              "SB-26010",
+              "SB-26020",
+              "SB-26021",
+              "SB-26022",
+              "SB-26002",
+              "SB-27005",
+              "SB-27007"
+            ],
+            "changedRingNos": [
+              "SB-26001",
+              "SB-26005",
+              "SB-26006",
+              "SB-26008"
+            ]
+          },
+          "events": {
+            "added": 0,
+            "removed": 7,
+            "changed": 0,
+            "addedEventKeys": [],
+            "removedEventKeys": [
+              "SB-26001:observations[1]",
+              "SB-26010:measurements[0]",
+              "SB-26010:releases[0]",
+              "SB-26020:measurements[0]",
+              "SB-26020:releases[0]",
+              "SB-26021:recaptures[0]",
+              "SB-26022:measurements[0]"
+            ],
+            "changedEventKeys": []
+          },
+          "dictionaries": {
+            "species": {
+              "added": 0,
+              "removed": 2,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [
+                "黑尾鸥",
+                "红嘴鸥"
+              ],
+              "changedValues": []
+            },
+            "capturePlace": {
+              "added": 0,
+              "removed": 2,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [
+                "东礁A区",
+                "东礁B区"
+              ],
+              "changedValues": []
+            },
+            "season": {
+              "added": 0,
+              "removed": 1,
+              "changed": 0,
+              "addedValues": [],
+              "removedValues": [
+                "2026春"
+              ],
+              "changedValues": []
+            }
+          },
+          "fieldSessions": {
+            "added": 0,
+            "removed": 3,
+            "changed": 0,
+            "addedIds": [],
+            "removedIds": [
+              "FS-2026-0503-001",
+              "FS-2026-0611-001",
+              "FS-2026-0618-OCZL"
+            ],
+            "changedIds": []
+          },
+          "ringInventory": {
+            "batches": {
+              "added": 0,
+              "removed": 2,
+              "changed": 0,
+              "addedIds": [],
+              "removedIds": [
+                "BATCH-2026-SPRING-001",
+                "BATCH-2026春-MQMMTF9Y"
+              ],
+              "changedIds": []
+            },
+            "rings": {
+              "added": 0,
+              "removed": 13,
+              "changed": 0,
+              "addedRingNos": [],
+              "removedRingNos": [
+                "SB-26001",
+                "SB-26002",
+                "SB-27000",
+                "SB-27001",
+                "SB-27002",
+                "SB-27003",
+                "SB-27004",
+                "SB-27005",
+                "SB-27006",
+                "SB-27007",
+                "SB-27008",
+                "SB-27009",
+                "SB-27010"
+              ],
+              "changedRingNos": []
+            }
+          }
+        }
+      },
+      "before": {
+        "birds": [
+          {
+            "ringNo": "SB-26010",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 1,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26020",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "juvenile",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0618-OCZL",
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 1,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26021",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0618-OCZL",
+            "measurementsCount": 0,
+            "recapturesCount": 1,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-26022",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": null,
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26002",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "subadult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-27005",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-27007",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "adult",
+            "capturePlace": "东礁B区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0611-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          }
+        ],
+        "fieldSessions": [
+          {
+            "id": "FS-2026-0503-001",
+            "date": "2026-05-03",
+            "season": "2026春",
+            "capturePlace": "东礁A区",
+            "team": [
+              "张三",
+              "李四",
+              "王五"
+            ],
+            "capturedCount": 15,
+            "releasedCount": 15
+          },
+          {
+            "id": "FS-2026-0611-001",
+            "date": "2026-06-11",
+            "season": "2026春",
+            "capturePlace": "东礁B区",
+            "team": [
+              "张三",
+              "李四"
+            ],
+            "capturedCount": 8,
+            "releasedCount": 8
+          },
+          {
+            "id": "FS-2026-0618-OCZL",
+            "date": "2026-06-18",
+            "season": "2026春",
+            "capturePlace": "东礁A区",
+            "team": [
+              "赵六",
+              "孙七"
+            ],
+            "capturedCount": 3,
+            "releasedCount": 3
+          }
+        ],
+        "ringInventory": {
+          "rings": [
+            {
+              "ringNo": "SB-26001",
+              "batchId": "BATCH-2026-SPRING-001",
+              "status": "allocated",
+              "allocatedTo": "SB-26001",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-26002",
+              "batchId": "BATCH-2026-SPRING-001",
+              "status": "reserved",
+              "allocatedTo": null,
+              "reservedBy": "FS-2026-0503-001",
+              "reservedAt": "2026-06-20T17:24:03.510Z",
+              "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
+            },
+            {
+              "ringNo": "SB-27000",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27001",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27002",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27003",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27004",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27005",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "allocated",
+              "allocatedTo": "SB-27005",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27006",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27007",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "allocated",
+              "allocatedTo": "SB-27007",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27008",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27009",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27010",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            }
+          ]
+        }
+      },
+      "after": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      }
+    },
+    {
+      "id": "LOG-MQNAXUXV-eeb7edec",
+      "timestamp": "2026-06-21T04:44:08.803Z",
+      "operationType": "system_snapshot_restore",
+      "targetType": "system",
+      "targetId": "SNAP-20260621042708-4848deb0",
+      "requestSummary": {
+        "snapshotId": "SNAP-20260621042708-4848deb0",
+        "legacyFormatNormalized": false,
+        "diff": {
+          "birds": {
+            "added": 7,
+            "removed": 0,
+            "changed": 4,
+            "addedRingNos": [
+              "SB-26010",
+              "SB-26020",
+              "SB-26021",
+              "SB-26022",
+              "SB-26002",
+              "SB-27005",
+              "SB-27007"
+            ],
+            "removedRingNos": [],
+            "changedRingNos": [
+              "SB-26001",
+              "SB-26005",
+              "SB-26006",
+              "SB-26008"
+            ]
+          },
+          "events": {
+            "added": 7,
+            "removed": 0,
+            "changed": 0,
+            "addedEventKeys": [
+              "SB-26010:measurements[0]",
+              "SB-26010:releases[0]",
+              "SB-26020:measurements[0]",
+              "SB-26020:releases[0]",
+              "SB-26021:recaptures[0]",
+              "SB-26001:observations[1]",
+              "SB-26022:measurements[0]"
+            ],
+            "removedEventKeys": [],
+            "changedEventKeys": []
+          },
+          "dictionaries": {
+            "species": {
+              "added": 2,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [
+                "黑尾鸥",
+                "红嘴鸥"
+              ],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "capturePlace": {
+              "added": 2,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [
+                "东礁A区",
+                "东礁B区"
+              ],
+              "removedValues": [],
+              "changedValues": []
+            },
+            "season": {
+              "added": 1,
+              "removed": 0,
+              "changed": 0,
+              "addedValues": [
+                "2026春"
+              ],
+              "removedValues": [],
+              "changedValues": []
+            }
+          },
+          "fieldSessions": {
+            "added": 3,
+            "removed": 0,
+            "changed": 0,
+            "addedIds": [
+              "FS-2026-0503-001",
+              "FS-2026-0611-001",
+              "FS-2026-0618-OCZL"
+            ],
+            "removedIds": [],
+            "changedIds": []
+          },
+          "ringInventory": {
+            "batches": {
+              "added": 2,
+              "removed": 0,
+              "changed": 0,
+              "addedIds": [
+                "BATCH-2026-SPRING-001",
+                "BATCH-2026春-MQMMTF9Y"
+              ],
+              "removedIds": [],
+              "changedIds": []
+            },
+            "rings": {
+              "added": 13,
+              "removed": 0,
+              "changed": 0,
+              "addedRingNos": [
+                "SB-26001",
+                "SB-26002",
+                "SB-27000",
+                "SB-27001",
+                "SB-27002",
+                "SB-27003",
+                "SB-27004",
+                "SB-27005",
+                "SB-27006",
+                "SB-27007",
+                "SB-27008",
+                "SB-27009",
+                "SB-27010"
+              ],
+              "removedRingNos": [],
+              "changedRingNos": []
+            }
+          }
+        }
+      },
+      "before": {
+        "birds": [],
+        "fieldSessions": [],
+        "ringInventory": {
+          "rings": []
+        }
+      },
+      "after": {
+        "birds": [
+          {
+            "ringNo": "SB-26010",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 1,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26020",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "juvenile",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0618-OCZL",
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 1,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26021",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0618-OCZL",
+            "measurementsCount": 0,
+            "recapturesCount": 1,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-26022",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": null,
+            "measurementsCount": 1,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "low"
+          },
+          {
+            "ringNo": "SB-26002",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "subadult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-27005",
+            "species": "黑尾鸥",
+            "sex": "male",
+            "age": "adult",
+            "capturePlace": "东礁A区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0503-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          },
+          {
+            "ringNo": "SB-27007",
+            "species": "黑尾鸥",
+            "sex": "female",
+            "age": "adult",
+            "capturePlace": "东礁B区",
+            "season": "2026春",
+            "fieldSessionId": "FS-2026-0611-001",
+            "measurementsCount": 0,
+            "recapturesCount": 0,
+            "observationsCount": 0,
+            "releasesCount": 0,
+            "healthRiskLevel": "high"
+          }
+        ],
+        "fieldSessions": [
+          {
+            "id": "FS-2026-0503-001",
+            "date": "2026-05-03",
+            "season": "2026春",
+            "capturePlace": "东礁A区",
+            "team": [
+              "张三",
+              "李四",
+              "王五"
+            ],
+            "capturedCount": 15,
+            "releasedCount": 15
+          },
+          {
+            "id": "FS-2026-0611-001",
+            "date": "2026-06-11",
+            "season": "2026春",
+            "capturePlace": "东礁B区",
+            "team": [
+              "张三",
+              "李四"
+            ],
+            "capturedCount": 8,
+            "releasedCount": 8
+          },
+          {
+            "id": "FS-2026-0618-OCZL",
+            "date": "2026-06-18",
+            "season": "2026春",
+            "capturePlace": "东礁A区",
+            "team": [
+              "赵六",
+              "孙七"
+            ],
+            "capturedCount": 3,
+            "releasedCount": 3
+          }
+        ],
+        "ringInventory": {
+          "rings": [
+            {
+              "ringNo": "SB-26001",
+              "batchId": "BATCH-2026-SPRING-001",
+              "status": "allocated",
+              "allocatedTo": "SB-26001",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-26002",
+              "batchId": "BATCH-2026-SPRING-001",
+              "status": "reserved",
+              "allocatedTo": null,
+              "reservedBy": "FS-2026-0503-001",
+              "reservedAt": "2026-06-20T17:24:03.510Z",
+              "reservedExpiresAt": "2026-06-21T17:24:03.510Z"
+            },
+            {
+              "ringNo": "SB-27000",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27001",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27002",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27003",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27004",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27005",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "allocated",
+              "allocatedTo": "SB-27005",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27006",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27007",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "allocated",
+              "allocatedTo": "SB-27007",
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27008",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27009",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            },
+            {
+              "ringNo": "SB-27010",
+              "batchId": "BATCH-2026春-MQMMTF9Y",
+              "status": "available",
+              "allocatedTo": null,
+              "reservedBy": null,
+              "reservedAt": null,
+              "reservedExpiresAt": null
+            }
+          ]
+        }
+      }
     }
   ]
 }
